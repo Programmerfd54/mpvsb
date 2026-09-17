@@ -1,0 +1,16 @@
+{
+  "name": "@context/config",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Общие tsconfig/eslint настройки рабочих пространств.",
+  "files": [
+    "tsconfig.base.json",
+    "tsconfig.lib.json",
+    "tsconfig.node-app.json"
+  ],
+  "exports": {
+    "./tsconfig.base.json": "./tsconfig.base.json",
+    "./tsconfig.lib.json": "./tsconfig.lib.json",
+    "./tsconfig.node-app.json": "./tsconfig.node-app.json"
+  }
+}

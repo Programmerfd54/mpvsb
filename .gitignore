@@ -1,0 +1,23 @@
+# Generated local Python caches and packaged delivery copies.
+__pycache__/
+*.py[cod]
+/deliverables/
+
+# Future application local secrets and generated output.
+node_modules/
+.next/
+dist/
+coverage/
+playwright-report/
+test-results/
+.env
+.env.*
+!.env.example
+.DS_Store
+
+# Сгенерированный Prisma-клиент: восстанавливается командой npm run db:generate.
+packages/database/generated/
+
+# Резервные копии базы: персональные данные и дампы в репозиторий не попадают.
+/backups/
+*.dump

@@ -1,0 +1,1137 @@
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../generated/prisma"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["core", "identity", "platform"]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model access_grants {
+  id                     String          @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id        String          @db.Uuid
+  grantee_user_id        String          @db.Uuid
+  purpose                String
+  resource_scope         Json            @default("{}")
+  permissions            String[]        @default([])
+  reason                 String
+  state                  String          @default("requested")
+  requested_by           String          @db.Uuid
+  requested_at           DateTime        @default(now()) @db.Timestamptz(6)
+  approved_by            String?         @db.Uuid
+  approved_at            DateTime?       @db.Timestamptz(6)
+  expires_at             DateTime?       @db.Timestamptz(6)
+  revoked_at             DateTime?       @db.Timestamptz(6)
+  decision_note          String?
+  created_at             DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime        @default(now()) @db.Timestamptz(6)
+  extends_grant_id       String?         @db.Uuid
+  requested_hours        Int?            @db.SmallInt
+  approver               users?          @relation("access_grants_approved_byTousers", fields: [approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  extends_grant_same_org access_grants?  @relation("access_grants_organization_id_extends_grant_idToaccess_grants", fields: [organization_id, extends_grant_id], references: [organization_id, id], onDelete: NoAction, onUpdate: NoAction, map: "access_grants_extends_same_org_fk")
+  extensions_same_org    access_grants[] @relation("access_grants_organization_id_extends_grant_idToaccess_grants")
+  grantee                users           @relation("access_grants_grantee_user_idTousers", fields: [grantee_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  organizations          organizations   @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  requester              users           @relation("access_grants_requested_byTousers", fields: [requested_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([organization_id, id])
+  @@index([organization_id, grantee_user_id, state, expires_at], map: "access_grants_active_idx")
+  @@index([extends_grant_id], map: "access_grants_extends_idx", where: raw("(extends_grant_id IS NOT NULL)"))
+  @@index([organization_id, state, requested_at(sort: Desc)], map: "access_grants_org_state_idx")
+  @@schema("core")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model answers {
+  id              String        @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id String        @db.Uuid
+  attempt_id      String        @db.Uuid
+  item_id         String
+  response_json   Json
+  revision        Int           @default(1)
+  saved_at        DateTime      @default(now()) @db.Timestamptz(6)
+  attempts        attempts      @relation(fields: [organization_id, attempt_id], references: [organization_id, id], onDelete: Cascade, onUpdate: NoAction)
+  organizations   organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([organization_id, attempt_id, item_id])
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model assignment_drafts {
+  id                  String             @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id     String             @db.Uuid
+  created_by          String             @db.Uuid
+  scenario_version_id String?            @db.Uuid
+  context_json        Json               @default("{}")
+  employee_ids        String[]           @default([]) @db.Uuid
+  due_days            Int?
+  step                Int                @default(1)
+  revision            Int                @default(1)
+  created_at          DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime           @default(now()) @db.Timestamptz(6)
+  users               users              @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations       organizations      @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  scenario_versions   scenario_versions? @relation(fields: [scenario_version_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([organization_id, id])
+  @@index([organization_id, created_by, updated_at(sort: Desc)], map: "assignment_drafts_owner_idx")
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model assignments {
+  id                     String                  @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id        String                  @db.Uuid
+  employee_id            String                  @db.Uuid
+  scenario_version_id    String                  @db.Uuid
+  context_snapshot       Json                    @default("{}")
+  mode                   String                  @default("demo")
+  state                  String                  @default("draft")
+  due_at                 DateTime?               @db.Timestamptz(6)
+  created_by             String                  @db.Uuid
+  completed_at           DateTime?               @db.Timestamptz(6)
+  cancelled_at           DateTime?               @db.Timestamptz(6)
+  cancel_reason          String?
+  replaces_assignment_id String?                 @db.Uuid
+  data_generation        BigInt                  @default(1)
+  processing_hold        Boolean                 @default(false)
+  created_at             DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime                @default(now()) @db.Timestamptz(6)
+  revision               Int                     @default(1)
+  users                  users                   @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees              employees               @relation(fields: [organization_id, employee_id], references: [organization_id, id], onUpdate: NoAction)
+  organizations          organizations           @relation(fields: [organization_id], references: [id], onUpdate: NoAction)
+  assignments            assignments?            @relation("assignmentsToassignments", fields: [replaces_assignment_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_assignments      assignments[]           @relation("assignmentsToassignments")
+  scenario_versions      scenario_versions       @relation(fields: [scenario_version_id], references: [id], onUpdate: NoAction)
+  attempts               attempts[]
+  consent_records        consent_records[]
+  evidence_items         evidence_items[]
+  invitations            invitations?
+  participant_sessions   participant_sessions?
+  participation_declines participation_declines?
+  reports                reports?
+  study_cases            study_cases[]
+
+  @@unique([organization_id, id])
+  @@index([organization_id, employee_id, created_at(sort: Desc)], map: "assignments_employee_idx")
+  @@index([organization_id, state, due_at], map: "assignments_state_idx")
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model attempts {
+  id                   String                @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id      String                @db.Uuid
+  assignment_id        String                @db.Uuid
+  method_version_id    String                @db.Uuid
+  order_index          Int
+  required             Boolean               @default(true)
+  state                String                @default("not_started")
+  started_at           DateTime?             @db.Timestamptz(6)
+  submitted_at         DateTime?             @db.Timestamptz(6)
+  question_order_json  Json                  @default("[]")
+  active_item_id       String?
+  revision             Int                   @default(1)
+  session_lease        Int                   @default(0)
+  created_at           DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime              @default(now()) @db.Timestamptz(6)
+  answers              answers[]
+  method_versions      method_versions       @relation(fields: [method_version_id], references: [id], onUpdate: NoAction)
+  assignments          assignments           @relation(fields: [organization_id, assignment_id], references: [organization_id, id], onDelete: Cascade, onUpdate: NoAction)
+  organizations        organizations         @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  score_results        score_results[]
+  submission_snapshots submission_snapshots?
+
+  @@unique([organization_id, assignment_id, method_version_id])
+  @@unique([organization_id, assignment_id, order_index])
+  @@unique([organization_id, id])
+  @@schema("core")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model baseline_predictions {
+  id              String        @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id String        @db.Uuid
+  case_id         String        @db.Uuid
+  value_json      Json
+  entered_by      String        @db.Uuid
+  locked_at       DateTime      @default(now()) @db.Timestamptz(6)
+  content_hash    String
+  users           users         @relation(fields: [entered_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  study_cases     study_cases   @relation(fields: [organization_id, case_id], references: [organization_id, id], onDelete: Cascade, onUpdate: NoAction)
+  organizations   organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([organization_id, case_id])
+  @@unique([organization_id, id])
+  @@schema("core")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model consent_records {
+  id                      String                  @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id         String                  @db.Uuid
+  assignment_id           String                  @db.Uuid
+  document_version_id     String                  @db.Uuid
+  document_hash           String
+  purpose                 String
+  accepted_at             DateTime                @default(now()) @db.Timestamptz(6)
+  withdrawn_at            DateTime?               @db.Timestamptz(6)
+  confirmation_metadata   Json                    @default("{}")
+  legal_document_versions legal_document_versions @relation(fields: [document_version_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  assignments             assignments             @relation(fields: [organization_id, assignment_id], references: [organization_id, id], onDelete: Cascade, onUpdate: NoAction)
+  organizations           organizations           @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([organization_id, assignment_id, document_version_id])
+  @@unique([organization_id, id])
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model correction_requests {
+  id                   String        @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id      String        @db.Uuid
+  resource_type        String
+  resource_id          String        @db.Uuid
+  requester_type       String
+  requester_user_id    String?       @db.Uuid
+  block_key            String?
+  description          String
+  state                String        @default("received")
+  resolution_reference String?       @db.Uuid
+  created_at           DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime      @default(now()) @db.Timestamptz(6)
+  organizations        organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users                users?        @relation(fields: [requester_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([organization_id, id])
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model decisions {
+  id                 String           @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id    String           @db.Uuid
+  report_revision_id String           @db.Uuid
+  actor_id           String           @db.Uuid
+  action_code        String
+  user_comment       String?
+  follow_up_at       DateTime?        @db.Timestamptz(6)
+  created_at         DateTime         @default(now()) @db.Timestamptz(6)
+  users              users            @relation(fields: [actor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations      organizations    @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  report_revisions   report_revisions @relation(fields: [organization_id, report_revision_id], references: [organization_id, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([organization_id, id])
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model evidence_items {
+  id                 String        @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id    String        @db.Uuid
+  assignment_id      String        @db.Uuid
+  evidence_code      String
+  kind               String
+  source_ref         String?
+  collected_at       DateTime      @db.Timestamptz(6)
+  normalized_content Json
+  limitations        Json          @default("[]")
+  content_hash       String
+  created_at         DateTime      @default(now()) @db.Timestamptz(6)
+  assignments        assignments   @relation(fields: [organization_id, assignment_id], references: [organization_id, id], onDelete: Cascade, onUpdate: NoAction)
+  organizations      organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([organization_id, assignment_id, evidence_code])
+  @@unique([organization_id, id])
+  @@schema("core")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model historical_snapshots {
+  id                     String        @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id        String        @db.Uuid
+  case_id                String        @db.Uuid
+  feature_schema_version String
+  observed_at            DateTime      @db.Timestamptz(6)
+  source_created_at      DateTime?     @db.Timestamptz(6)
+  imported_at            DateTime      @default(now()) @db.Timestamptz(6)
+  payload                Json
+  content_hash           String
+  source_provenance      Json          @default("{}")
+  study_cases            study_cases   @relation(fields: [organization_id, case_id], references: [organization_id, id], onDelete: Cascade, onUpdate: NoAction)
+  organizations          organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([organization_id, id])
+  @@schema("core")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model invitations {
+  id                   String                 @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id      String                 @db.Uuid
+  assignment_id        String                 @db.Uuid
+  token_hash           String                 @unique
+  expires_at           DateTime               @db.Timestamptz(6)
+  revoked_at           DateTime?              @db.Timestamptz(6)
+  issued_by            String                 @db.Uuid
+  last_exchanged_at    DateTime?              @db.Timestamptz(6)
+  exchange_count       Int                    @default(0)
+  created_at           DateTime               @default(now()) @db.Timestamptz(6)
+  users                users                  @relation(fields: [issued_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  assignments          assignments            @relation(fields: [organization_id, assignment_id], references: [organization_id, id], onDelete: Cascade, onUpdate: NoAction)
+  organizations        organizations          @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  participant_sessions participant_sessions[]
+
+  @@unique([organization_id, assignment_id], map: "invitations_active_key", where: raw("(revoked_at IS NULL)"))
+  @@unique([organization_id, id])
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model knowledge_article_versions {
+  id                     String               @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  article_id             String               @db.Uuid
+  revision_no            Int
+  status                 String               @default("draft")
+  title                  String
+  excerpt                String?
+  body_markdown          String
+  content_hash           String
+  published_at           DateTime?            @db.Timestamptz(6)
+  published_by           String?              @db.Uuid
+  created_at             DateTime             @default(now()) @db.Timestamptz(6)
+  article                knowledge_articles   @relation("knowledge_article_versions_article_idToknowledge_articles", fields: [article_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users                  users?               @relation(fields: [published_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  published_for_articles knowledge_articles[] @relation("knowledge_articles_current_published_version_idToknowledge_article_versions")
+
+  @@unique([article_id, revision_no])
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model knowledge_articles {
+  id                           String                       @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  slug                         String
+  locale                       String                       @default("ru")
+  audience                     String
+  category                     String
+  current_published_version_id String?                      @db.Uuid
+  created_at                   DateTime                     @default(now()) @db.Timestamptz(6)
+  updated_at                   DateTime                     @default(now()) @db.Timestamptz(6)
+  versions                     knowledge_article_versions[] @relation("knowledge_article_versions_article_idToknowledge_articles")
+  current_published_version    knowledge_article_versions?  @relation("knowledge_articles_current_published_version_idToknowledge_article_versions", fields: [current_published_version_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "knowledge_current_version_fk")
+
+  @@unique([slug, locale])
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model legal_document_versions {
+  id               String            @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  key              String
+  locale           String            @default("ru")
+  semantic_version String
+  status           String            @default("draft")
+  title            String
+  body             String
+  purpose          String
+  content_hash     String
+  effective_from   DateTime?         @db.Timestamptz(6)
+  approved_by      String?           @db.Uuid
+  approved_at      DateTime?         @db.Timestamptz(6)
+  created_at       DateTime          @default(now()) @db.Timestamptz(6)
+  consent_records  consent_records[]
+  users            users?            @relation(fields: [approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([key, locale, semantic_version])
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model memberships {
+  id              String           @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id String           @db.Uuid
+  user_id         String           @db.Uuid
+  role            String           @default("manager")
+  permissions     String[]         @default([])
+  status          String           @default("invited")
+  invited_by      String?          @db.Uuid
+  created_at      DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime         @default(now()) @db.Timestamptz(6)
+  inviter         users?           @relation("memberships_invited_byTousers", fields: [invited_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations   organizations    @relation(fields: [organization_id], references: [id], onUpdate: NoAction)
+  user            users            @relation("memberships_user_idTousers", fields: [user_id], references: [id], onUpdate: NoAction)
+  account_tokens  account_tokens[]
+
+  @@unique([organization_id, id])
+  @@unique([organization_id, user_id])
+  @@index([user_id, status], map: "memberships_user_idx")
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model method_versions {
+  id                        String             @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  method_id                 String             @db.Uuid
+  semantic_version          String
+  status                    String             @default("draft")
+  applicability_mode        String             @default("demo")
+  passport_json             Json               @default("{}")
+  items_json                Json               @default("[]")
+  scoring_config_json       Json               @default("{}")
+  scorer_id                 String?
+  scorer_version            String?
+  interpretation_rules_json Json               @default("{}")
+  missing_policy            String             @default("reject")
+  license_metadata          Json               @default("{}")
+  validation_metadata       Json               @default("{}")
+  fixtures_json             Json               @default("[]")
+  content_hash              String?
+  published_at              DateTime?          @db.Timestamptz(6)
+  published_by              String?            @db.Uuid
+  created_at                DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime           @default(now()) @db.Timestamptz(6)
+  attempts                  attempts[]
+  method                    methods            @relation("method_versions_method_idTomethods", fields: [method_id], references: [id], onUpdate: NoAction)
+  users                     users?             @relation(fields: [published_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  published_for_methods     methods[]          @relation("methods_current_published_version_idTomethod_versions")
+  predictions               predictions[]
+  scenario_methods          scenario_methods[]
+
+  @@unique([method_id, semantic_version])
+  @@index([status, applicability_mode], map: "method_versions_status_idx")
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model methods {
+  id                           String            @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  stable_code                  String            @unique
+  title                        String
+  current_published_version_id String?           @db.Uuid
+  created_at                   DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at                   DateTime          @default(now()) @db.Timestamptz(6)
+  versions                     method_versions[] @relation("method_versions_method_idTomethods")
+  current_published_version    method_versions?  @relation("methods_current_published_version_idTomethod_versions", fields: [current_published_version_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "methods_current_version_fk")
+
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model notifications {
+  id                String        @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id   String        @db.Uuid
+  recipient_user_id String        @db.Uuid
+  type              String
+  resource_type     String?
+  resource_id       String?       @db.Uuid
+  title             String
+  read_at           DateTime?     @db.Timestamptz(6)
+  event_key         String
+  created_at        DateTime      @default(now()) @db.Timestamptz(6)
+  organizations     organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users             users         @relation(fields: [recipient_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([organization_id, id])
+  @@unique([recipient_user_id, event_key])
+  @@index([organization_id, recipient_user_id, read_at, created_at(sort: Desc)], map: "notifications_inbox_idx")
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model organizations {
+  id                          String                     @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  name                        String
+  code                        String                     @unique
+  timezone                    String                     @default("Europe/Moscow")
+  mode                        String                     @default("demo")
+  status                      String                     @default("active")
+  participant_contact         String?
+  active_employee_limit       Int                        @default(500)
+  retention_policy_version_id String?                    @db.Uuid
+  created_at                  DateTime                   @default(now()) @db.Timestamptz(6)
+  updated_at                  DateTime                   @default(now()) @db.Timestamptz(6)
+  revision                    Int                        @default(1)
+  access_grants               access_grants[]
+  answers                     answers[]
+  assignment_drafts           assignment_drafts[]
+  assignments                 assignments[]
+  attempts                    attempts[]
+  baseline_predictions        baseline_predictions[]
+  consent_records             consent_records[]
+  correction_requests         correction_requests[]
+  decisions                   decisions[]
+  evidence_items              evidence_items[]
+  historical_snapshots        historical_snapshots[]
+  invitations                 invitations[]
+  memberships                 memberships[]
+  notifications               notifications[]
+  retention_policy_versions   retention_policy_versions? @relation(fields: [retention_policy_version_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "organizations_retention_policy_fk")
+  participant_sessions        participant_sessions[]
+  participation_declines      participation_declines[]
+  predictions                 predictions[]
+  report_reviews              report_reviews[]
+  report_revisions            report_revisions[]
+  reports                     reports[]
+  score_results               score_results[]
+  studies                     studies[]
+  study_cases                 study_cases[]
+  submission_snapshots        submission_snapshots[]
+  employees                   employees[]
+  audit_events                audit_events[]
+  deletion_jobs               deletion_jobs[]
+  outbox_events               outbox_events[]
+  privacy_requests            privacy_requests[]
+  readiness_checks            readiness_checks[]
+
+  @@schema("core")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model participant_sessions {
+  id                  String        @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id     String        @db.Uuid
+  assignment_id       String        @db.Uuid
+  invitation_id       String        @db.Uuid
+  session_hash        String        @unique
+  lease_version       Int           @default(1)
+  created_at          DateTime      @default(now()) @db.Timestamptz(6)
+  last_seen_at        DateTime      @default(now()) @db.Timestamptz(6)
+  idle_expires_at     DateTime      @db.Timestamptz(6)
+  absolute_expires_at DateTime      @db.Timestamptz(6)
+  revoked_at          DateTime?     @db.Timestamptz(6)
+  invitations         invitations   @relation(fields: [invitation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  assignments         assignments   @relation(fields: [organization_id, assignment_id], references: [organization_id, id], onDelete: Cascade, onUpdate: NoAction)
+  organizations       organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([organization_id, assignment_id], map: "participant_sessions_active_key", where: raw("(revoked_at IS NULL)"))
+  @@unique([organization_id, id])
+  @@schema("core")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model participation_declines {
+  id              String        @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id String        @db.Uuid
+  assignment_id   String        @db.Uuid
+  declined_at     DateTime      @default(now()) @db.Timestamptz(6)
+  assignments     assignments   @relation(fields: [organization_id, assignment_id], references: [organization_id, id], onDelete: Cascade, onUpdate: NoAction)
+  organizations   organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([organization_id, assignment_id])
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model predictions {
+  id                   String            @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id      String            @db.Uuid
+  case_id              String            @db.Uuid
+  target               String
+  horizon_days         Int?
+  output_type          String
+  value_json           Json
+  supported_capability String?
+  method_version_id    String?           @db.Uuid
+  report_revision_id   String?           @db.Uuid
+  frozen_at            DateTime?         @db.Timestamptz(6)
+  content_hash         String?
+  created_at           DateTime          @default(now()) @db.Timestamptz(6)
+  method_versions      method_versions?  @relation(fields: [method_version_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  study_cases          study_cases       @relation(fields: [organization_id, case_id], references: [organization_id, id], onDelete: Cascade, onUpdate: NoAction)
+  organizations        organizations     @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  report_revisions     report_revisions? @relation(fields: [organization_id, report_revision_id], references: [organization_id, id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@unique([organization_id, case_id, target])
+  @@unique([organization_id, id])
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model prompt_versions {
+  id                    String              @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  key                   String
+  semantic_version      String
+  status                String              @default("draft")
+  template              String
+  output_schema_version String
+  provider_policy_id    String?
+  review_metadata       Json                @default("{}")
+  content_hash          String?
+  created_at            DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime            @default(now()) @db.Timestamptz(6)
+  report_revisions      report_revisions[]
+  scenario_versions     scenario_versions[]
+
+  @@unique([key, semantic_version])
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model report_reviews {
+  id               String           @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id  String           @db.Uuid
+  revision_id      String           @db.Uuid
+  reviewer_id      String           @db.Uuid
+  checklist_json   Json
+  action           String
+  comment          String?
+  reviewed_at      DateTime         @default(now()) @db.Timestamptz(6)
+  organizations    organizations    @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  report_revisions report_revisions @relation(fields: [organization_id, revision_id], references: [organization_id, id], onDelete: Cascade, onUpdate: NoAction)
+  users            users            @relation(fields: [reviewer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([organization_id, id])
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model report_revisions {
+  id                     String             @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id        String             @db.Uuid
+  report_id              String             @db.Uuid
+  revision_no            Int
+  state                  String             @default("queued")
+  input_hash             String?
+  evidence_snapshot_hash String?
+  prompt_version_id      String?            @db.Uuid
+  output_schema_version  String?
+  model_version          String?
+  generation_mode        String?
+  content_json           Json?
+  content_hash           String?
+  failure_code           String?
+  reviewer_id            String?            @db.Uuid
+  reviewed_at            DateTime?          @db.Timestamptz(6)
+  published_at           DateTime?          @db.Timestamptz(6)
+  supersedes_id          String?            @db.Uuid
+  created_at             DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime           @default(now()) @db.Timestamptz(6)
+  decisions              decisions[]
+  predictions            predictions[]
+  report_reviews         report_reviews[]
+  organizations          organizations      @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  report                 reports            @relation("report_revisions_organization_id_report_idToreports", fields: [organization_id, report_id], references: [organization_id, id], onDelete: Cascade, onUpdate: NoAction)
+  prompt_versions        prompt_versions?   @relation(fields: [prompt_version_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users                  users?             @relation(fields: [reviewer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  report_revisions       report_revisions?  @relation("report_revisionsToreport_revisions", fields: [supersedes_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_report_revisions report_revisions[] @relation("report_revisionsToreport_revisions")
+  published_for_reports  reports[]          @relation("reports_organization_id_current_published_revision_idToreport_revisions")
+
+  @@unique([organization_id, id])
+  @@unique([organization_id, report_id, revision_no])
+  @@index([organization_id, state, created_at], map: "report_revisions_review_idx")
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model reporting_policies {
+  id                     String              @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  stable_code            String
+  semantic_version       String
+  permitted_claims       Json                @default("[]")
+  required_limitations   Json                @default("[]")
+  forbidden_claims       Json                @default("[]")
+  participant_visibility String              @default("completion_receipt")
+  created_at             DateTime            @default(now()) @db.Timestamptz(6)
+  scenario_versions      scenario_versions[]
+
+  @@unique([stable_code, semantic_version])
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model reports {
+  id                            String             @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id               String             @db.Uuid
+  assignment_id                 String             @db.Uuid
+  current_published_revision_id String?            @db.Uuid
+  status                        String             @default("queued")
+  published_at                  DateTime?          @db.Timestamptz(6)
+  created_at                    DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at                    DateTime           @default(now()) @db.Timestamptz(6)
+  revisions                     report_revisions[] @relation("report_revisions_organization_id_report_idToreports")
+  current_published_revision    report_revisions?  @relation("reports_organization_id_current_published_revision_idToreport_revisions", fields: [organization_id, current_published_revision_id], references: [organization_id, id], onDelete: NoAction, onUpdate: NoAction, map: "reports_current_revision_fk")
+  assignments                   assignments        @relation(fields: [organization_id, assignment_id], references: [organization_id, id], onDelete: Cascade, onUpdate: NoAction)
+  organizations                 organizations      @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([organization_id, assignment_id])
+  @@unique([organization_id, id])
+  @@index([organization_id, status, published_at(sort: Desc)], map: "reports_published_idx")
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model retention_policy_versions {
+  id               String          @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  stable_code      String
+  semantic_version String
+  status           String          @default("draft")
+  mode             String          @default("demo")
+  rules_json       Json            @default("{}")
+  legal_basis      String?
+  approved_by      String?         @db.Uuid
+  approved_at      DateTime?       @db.Timestamptz(6)
+  created_at       DateTime        @default(now()) @db.Timestamptz(6)
+  organizations    organizations[]
+  users            users?          @relation(fields: [approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([stable_code, semantic_version])
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model scenario_methods {
+  id                  String            @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  scenario_version_id String            @db.Uuid
+  method_version_id   String            @db.Uuid
+  order_index         Int
+  required            Boolean           @default(true)
+  method_versions     method_versions   @relation(fields: [method_version_id], references: [id], onUpdate: NoAction)
+  scenario_versions   scenario_versions @relation(fields: [scenario_version_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([scenario_version_id, method_version_id])
+  @@unique([scenario_version_id, order_index])
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model scenario_versions {
+  id                      String              @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  scenario_id             String              @db.Uuid
+  semantic_version        String
+  status                  String              @default("draft")
+  applicability_mode      String              @default("demo")
+  context_schema_json     Json                @default("{}")
+  reporting_policy_id     String?             @db.Uuid
+  prompt_version_id       String?             @db.Uuid
+  participant_visibility  String              @default("completion_receipt")
+  content_hash            String?
+  published_at            DateTime?           @db.Timestamptz(6)
+  published_by            String?             @db.Uuid
+  created_at              DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime            @default(now()) @db.Timestamptz(6)
+  assignment_drafts       assignment_drafts[]
+  assignments             assignments[]
+  scenario_methods        scenario_methods[]
+  prompt_versions         prompt_versions?    @relation(fields: [prompt_version_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users                   users?              @relation(fields: [published_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  reporting_policies      reporting_policies? @relation(fields: [reporting_policy_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  scenario                scenarios           @relation("scenario_versions_scenario_idToscenarios", fields: [scenario_id], references: [id], onUpdate: NoAction)
+  published_for_scenarios scenarios[]         @relation("scenarios_current_published_version_idToscenario_versions")
+  studies                 studies[]
+
+  @@unique([scenario_id, semantic_version])
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model scenarios {
+  id                           String              @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  stable_code                  String              @unique
+  title                        String
+  current_published_version_id String?             @db.Uuid
+  created_at                   DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at                   DateTime            @default(now()) @db.Timestamptz(6)
+  versions                     scenario_versions[] @relation("scenario_versions_scenario_idToscenarios")
+  current_published_version    scenario_versions?  @relation("scenarios_current_published_version_idToscenario_versions", fields: [current_published_version_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "scenarios_current_version_fk")
+
+  @@schema("core")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model score_results {
+  id                    String        @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id       String        @db.Uuid
+  attempt_id            String        @db.Uuid
+  scorer_version        String
+  input_hash            String
+  output_schema_version String
+  result_json           Json
+  missing_json          Json          @default("[]")
+  created_at            DateTime      @default(now()) @db.Timestamptz(6)
+  attempts              attempts      @relation(fields: [organization_id, attempt_id], references: [organization_id, id], onDelete: Cascade, onUpdate: NoAction)
+  organizations         organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([organization_id, attempt_id, scorer_version, input_hash])
+  @@unique([organization_id, id])
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model studies {
+  id                              String             @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id                 String             @db.Uuid
+  title                           String
+  study_type                      String
+  scenario_version_id             String?            @db.Uuid
+  protocol_json                   Json               @default("{}")
+  protocol_hash                   String?
+  phase                           String             @default("draft")
+  predictive_capability_available Boolean            @default(false)
+  locked_at                       DateTime?          @db.Timestamptz(6)
+  predictions_frozen_at           DateTime?          @db.Timestamptz(6)
+  roster_hash                     String?
+  custodian_user_id               String?            @db.Uuid
+  evaluator_user_id               String?            @db.Uuid
+  created_by                      String             @db.Uuid
+  created_at                      DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at                      DateTime           @default(now()) @db.Timestamptz(6)
+  creator                         users              @relation("studies_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  custodian                       users?             @relation("studies_custodian_user_idTousers", fields: [custodian_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  evaluator                       users?             @relation("studies_evaluator_user_idTousers", fields: [evaluator_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations                   organizations      @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  scenario_versions               scenario_versions? @relation(fields: [scenario_version_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  study_cases                     study_cases[]
+
+  @@unique([organization_id, id])
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model study_cases {
+  id                      String                 @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id         String                 @db.Uuid
+  study_id                String                 @db.Uuid
+  case_code               String
+  assignment_id           String?                @db.Uuid
+  inclusion_state         String                 @default("included")
+  exclusion_reason        String?
+  evidence_cutoff_at      DateTime?              @db.Timestamptz(6)
+  follow_up_end_at        DateTime?              @db.Timestamptz(6)
+  eligibility_attestation Json                   @default("{}")
+  created_at              DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime               @default(now()) @db.Timestamptz(6)
+  baseline_predictions    baseline_predictions?
+  historical_snapshots    historical_snapshots[]
+  predictions             predictions[]
+  assignments             assignments?           @relation(fields: [organization_id, assignment_id], references: [organization_id, id], onDelete: SetNull, onUpdate: NoAction)
+  organizations           organizations          @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  studies                 studies                @relation(fields: [organization_id, study_id], references: [organization_id, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([organization_id, id])
+  @@unique([organization_id, study_id, case_code])
+  @@schema("core")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model submission_snapshots {
+  id                    String        @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id       String        @db.Uuid
+  attempt_id            String        @db.Uuid
+  answers_snapshot_json Json
+  input_hash            String
+  consent_hash          String
+  submitted_at          DateTime      @default(now()) @db.Timestamptz(6)
+  attempts              attempts      @relation(fields: [organization_id, attempt_id], references: [organization_id, id], onDelete: Cascade, onUpdate: NoAction)
+  organizations         organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([organization_id, attempt_id])
+  @@unique([organization_id, id])
+  @@schema("core")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model account_tokens {
+  id                String              @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  user_id           String?             @db.Uuid
+  membership_id     String?             @db.Uuid
+  purpose           String
+  token_hash        String              @unique
+  expires_at        DateTime            @db.Timestamptz(6)
+  used_at           DateTime?           @db.Timestamptz(6)
+  revoked_at        DateTime?           @db.Timestamptz(6)
+  created_at        DateTime            @default(now()) @db.Timestamptz(6)
+  memberships       memberships?        @relation(fields: [membership_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users             users?              @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  recovery_requests recovery_requests[]
+
+  @@index([user_id, purpose], map: "account_tokens_user_idx")
+  @@schema("identity")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model employees {
+  id              String        @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id String        @db.Uuid
+  display_name    String?
+  external_code   String?
+  job_title       String?
+  department      String?
+  email           String?
+  archived_at     DateTime?     @db.Timestamptz(6)
+  created_at      DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime      @default(now()) @db.Timestamptz(6)
+  revision        Int           @default(1)
+  assignments     assignments[]
+  organizations   organizations @relation(fields: [organization_id], references: [id], onUpdate: NoAction)
+
+  @@unique([organization_id, external_code], map: "employees_external_code_key", where: raw("(external_code IS NOT NULL)"))
+  @@unique([organization_id, id])
+  @@index([organization_id, archived_at, id], map: "employees_active_idx")
+  @@schema("identity")
+}
+
+model mfa_credentials {
+  user_id               String    @id @db.Uuid
+  encrypted_totp_secret String
+  verified_at           DateTime? @db.Timestamptz(6)
+  created_at            DateTime  @default(now()) @db.Timestamptz(6)
+  users                 users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@schema("identity")
+}
+
+model mfa_recovery_codes {
+  id         String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  user_id    String    @db.Uuid
+  code_hash  String
+  used_at    DateTime? @db.Timestamptz(6)
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+  users      users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, code_hash])
+  @@schema("identity")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model recovery_requests {
+  id                  String          @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  user_id             String?         @db.Uuid
+  submitted_reference String
+  state               String          @default("received")
+  verified_by         String?         @db.Uuid
+  verified_at         DateTime?       @db.Timestamptz(6)
+  resolution_ref      String?         @db.Uuid
+  created_at          DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime        @default(now()) @db.Timestamptz(6)
+  account_tokens      account_tokens? @relation(fields: [resolution_ref], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user                users?          @relation("recovery_requests_user_idTousers", fields: [user_id], references: [id], onUpdate: NoAction)
+  verifier            users?          @relation("recovery_requests_verified_byTousers", fields: [verified_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@schema("identity")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model user_sessions {
+  id                  String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  session_hash        String    @unique
+  user_id             String    @db.Uuid
+  actor_type          String
+  device_hint         String?
+  created_at          DateTime  @default(now()) @db.Timestamptz(6)
+  last_seen_at        DateTime  @default(now()) @db.Timestamptz(6)
+  idle_expires_at     DateTime  @db.Timestamptz(6)
+  absolute_expires_at DateTime  @db.Timestamptz(6)
+  revoked_at          DateTime? @db.Timestamptz(6)
+  users               users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id, revoked_at], map: "user_sessions_user_idx")
+  @@schema("identity")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model users {
+  id                                                    String                       @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  email_normalized                                      String                       @unique
+  email_display                                         String
+  display_name                                          String
+  password_hash                                         String?
+  platform_role                                         String?
+  status                                                String                       @default("invited")
+  mfa_required                                          Boolean                      @default(false)
+  created_at                                            DateTime                     @default(now()) @db.Timestamptz(6)
+  updated_at                                            DateTime                     @default(now()) @db.Timestamptz(6)
+  approved_grants                                       access_grants[]              @relation("access_grants_approved_byTousers")
+  granted_accesses                                      access_grants[]              @relation("access_grants_grantee_user_idTousers")
+  requested_grants                                      access_grants[]              @relation("access_grants_requested_byTousers")
+  assignment_drafts                                     assignment_drafts[]
+  assignments                                           assignments[]
+  baseline_predictions                                  baseline_predictions[]
+  correction_requests                                   correction_requests[]
+  decisions                                             decisions[]
+  invitations                                           invitations[]
+  knowledge_article_versions                            knowledge_article_versions[]
+  legal_document_versions                               legal_document_versions[]
+  invited_memberships                                   memberships[]                @relation("memberships_invited_byTousers")
+  memberships                                           memberships[]                @relation("memberships_user_idTousers")
+  method_versions                                       method_versions[]
+  notifications                                         notifications[]
+  report_reviews                                        report_reviews[]
+  report_revisions                                      report_revisions[]
+  retention_policy_versions                             retention_policy_versions[]
+  scenario_versions                                     scenario_versions[]
+  created_studies                                       studies[]                    @relation("studies_created_byTousers")
+  custodian_studies                                     studies[]                    @relation("studies_custodian_user_idTousers")
+  evaluator_studies                                     studies[]                    @relation("studies_evaluator_user_idTousers")
+  account_tokens                                        account_tokens[]
+  mfa_credentials                                       mfa_credentials?
+  mfa_recovery_codes                                    mfa_recovery_codes[]
+  recovery_requests                                     recovery_requests[]          @relation("recovery_requests_user_idTousers")
+  verified_recovery_requests                            recovery_requests[]          @relation("recovery_requests_verified_byTousers")
+  user_sessions                                         user_sessions[]
+  outbox_events_outbox_events_retried_byTousers         outbox_events[]              @relation("outbox_events_retried_byTousers")
+  outbox_events_outbox_events_retries_stopped_byTousers outbox_events[]              @relation("outbox_events_retries_stopped_byTousers")
+  privacy_requests                                      privacy_requests[]
+  readiness_checks                                      readiness_checks[]
+
+  @@schema("identity")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model audit_events {
+  id              String         @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  occurred_at     DateTime       @default(now()) @db.Timestamptz(6)
+  actor_type      String
+  actor_id        String?        @db.Uuid
+  organization_id String?        @db.Uuid
+  action          String
+  resource_type   String?
+  resource_id     String?        @db.Uuid
+  outcome         String
+  request_id      String?
+  purpose         String?
+  metadata        Json           @default("{}")
+  organizations   organizations? @relation(fields: [organization_id], references: [id], onUpdate: NoAction)
+
+  @@index([actor_id, occurred_at(sort: Desc)], map: "audit_events_actor_idx")
+  @@index([organization_id, occurred_at(sort: Desc), action], map: "audit_events_lookup_idx")
+  @@schema("platform")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model deletion_jobs {
+  id                 String           @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id    String           @db.Uuid
+  privacy_request_id String           @db.Uuid
+  scope_json         Json
+  data_generation    BigInt
+  state              String           @default("queued")
+  started_at         DateTime?        @db.Timestamptz(6)
+  completed_at       DateTime?        @db.Timestamptz(6)
+  receipt_json       Json             @default("{}")
+  last_error_code    String?
+  created_at         DateTime         @default(now()) @db.Timestamptz(6)
+  organizations      organizations    @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  privacy_requests   privacy_requests @relation(fields: [privacy_request_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@schema("platform")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model idempotency_records {
+  id                 String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  actor_scope        String
+  route              String
+  idempotency_key    String
+  request_hash       String
+  state              String   @default("in_progress")
+  response_reference Json     @default("{}")
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+  expires_at         DateTime @db.Timestamptz(6)
+
+  @@unique([actor_scope, route, idempotency_key])
+  @@index([expires_at], map: "idempotency_expiry_idx")
+  @@schema("platform")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model outbox_events {
+  id                                            String         @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  event_type                                    String
+  organization_id                               String?        @db.Uuid
+  entity_type                                   String
+  entity_id                                     String         @db.Uuid
+  payload                                       Json           @default("{}")
+  data_generation                               BigInt         @default(1)
+  created_at                                    DateTime       @default(now()) @db.Timestamptz(6)
+  published_at                                  DateTime?      @db.Timestamptz(6)
+  attempts                                      Int            @default(0)
+  last_error_code                               String?
+  completed_at                                  DateTime?      @db.Timestamptz(6)
+  failed_at                                     DateTime?      @db.Timestamptz(6)
+  retries_stopped_at                            DateTime?      @db.Timestamptz(6)
+  retries_stopped_by                            String?        @db.Uuid
+  retried_at                                    DateTime?      @db.Timestamptz(6)
+  retried_by                                    String?        @db.Uuid
+  organizations                                 organizations? @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_outbox_events_retried_byTousers         users?         @relation("outbox_events_retried_byTousers", fields: [retried_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_outbox_events_retries_stopped_byTousers users?         @relation("outbox_events_retries_stopped_byTousers", fields: [retries_stopped_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([published_at, created_at], map: "outbox_pending_idx", where: raw("((published_at IS NULL) AND (retries_stopped_at IS NULL))"))
+  @@index([created_at(sort: Desc), event_type], map: "outbox_events_admin_idx")
+  @@index([failed_at(sort: Desc)], map: "outbox_events_failed_idx", where: raw("(failed_at IS NOT NULL)"))
+  @@schema("platform")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model privacy_requests {
+  id               String          @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id  String          @db.Uuid
+  subject_type     String
+  assignment_id    String?         @db.Uuid
+  employee_id      String?         @db.Uuid
+  request_type     String
+  description      String?
+  state            String          @default("received")
+  receipt_code     String          @unique
+  requested_at     DateTime        @default(now()) @db.Timestamptz(6)
+  approved_by      String?         @db.Uuid
+  approved_at      DateTime?       @db.Timestamptz(6)
+  completed_at     DateTime?       @db.Timestamptz(6)
+  rejection_reason String?
+  updated_at       DateTime        @default(now()) @db.Timestamptz(6)
+  deletion_jobs    deletion_jobs[]
+  users            users?          @relation(fields: [approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations    organizations   @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([organization_id, id])
+  @@schema("platform")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model readiness_checks {
+  id              String        @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id String        @db.Uuid
+  check_key       String
+  state           String        @default("pending")
+  verified_by     String?       @db.Uuid
+  verified_at     DateTime?     @db.Timestamptz(6)
+  evidence_ref    String?
+  expires_at      DateTime?     @db.Timestamptz(6)
+  note            String?
+  updated_at      DateTime      @default(now()) @db.Timestamptz(6)
+  organizations   organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users           users?        @relation(fields: [verified_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([organization_id, check_key])
+  @@schema("platform")
+}

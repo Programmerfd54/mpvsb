@@ -1,0 +1,206 @@
+# Проверки на каждый PR и на push в main (ТЗ 12.5).
+#
+# Порядок повторяет локальный: чистая установка по lockfile → стиль → правила →
+# типы → модульные тесты → тесты на реальной базе под runtime-ролями → сборка →
+# проверка документации → сборка образов.
+#
+# Секретов здесь нет и не должно быть:
+#   • пароли runtime-ролей генерируются в самом job и живут только в его окружении;
+#   • база — эфемерный сервис внутри runner, наружу не опубликована;
+#   • образы собираются, но не публикуются;
+#   • тесты с реальным provider заключений не запускаются: без ключей они должны
+#     быть явно пропущены с причиной, а не «пройдены» (ТЗ 12.5).
+#
+# Скриншоты и артефакты — только синтетические данные.
+#
+# Внешние действия закреплены по commit SHA с комментарием-версией: подвижный тег
+# (@v5) владелец репозитория действия может переставить на другой код, и сборка
+# перестала бы быть воспроизводимой — при том что npm ci и версия Node закреплены
+# строго. Обновление версии — осознанная правка SHA и комментария.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Ничего не публикуем и не комментируем: чтение репозитория — всё, что нужно.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NPM_CONFIG_FUND: 'false'
+  NPM_CONFIG_AUDIT: 'false'
+
+jobs:
+  # Стиль, правила, типы, модульные тесты, сборка, документация.
+  quality:
+    name: Стиль, типы, модульные тесты, сборка
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Установка по lockfile
+        run: npm ci
+
+      - name: Генерация клиента Prisma
+        # Клиент не коммитится: типы пакетов зависят от него, поэтому до typecheck.
+        run: npm run db:generate
+
+      - name: Форматирование
+        run: npm run format
+
+      - name: Правила ESLint
+        run: npm run lint
+
+      - name: Типы
+        run: npm run typecheck
+
+      - name: Модульные тесты
+        run: npm test
+
+      - name: Production-сборка всех рабочих пространств
+        run: npm run build
+
+      - name: Типы набора e2e
+        # Отдельный tsconfig у tests/e2e: npm run typecheck его не покрывает,
+        # и поломка типов в e2e прошла бы CI незамеченной. Локальный агрегат
+        # npm run verify этот шаг включает — CI должен совпадать с ним.
+        run: npm run typecheck:e2e
+
+      - name: Проверка документации
+        run: python3 scripts/check_spec.py
+
+  # Тесты на реальном PostgreSQL: RLS, права ролей, сквозной путь.
+  integration:
+    name: Тесты на реальной базе
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: context_owner
+          # Одноразовый пароль эфемерного контейнера внутри runner: база живёт
+          # только на время job и портов наружу не имеет. Секретом не является.
+          POSTGRES_PASSWORD: context_ci_ephemeral
+          POSTGRES_DB: context_test
+          POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale-provider=icu --icu-locale=ru-RU'
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U context_owner -d context_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Установка по lockfile
+        run: npm ci
+
+      - name: Генерация клиента Prisma
+        run: npm run db:generate
+
+      - name: Пароли runtime-ролей на время job
+        # Роли создаёт скрипт миграции этими паролями. Значения случайные,
+        # существуют только в окружении job и в журнал не попадают.
+        run: |
+          for role in API WORKER EVALUATOR; do
+            password="$(openssl rand -base64 24)"
+            # Маскирование: даже случайно выведенный пароль не окажется в журнале.
+            echo "::add-mask::$password"
+            echo "DB_PASSWORD_${role}=${password}" >> "$GITHUB_ENV"
+          done
+
+      - name: Строки подключения тестовой базы
+        run: |
+          host=127.0.0.1:5432
+          db=context_test
+          # Пароль уходит в node через окружение, а не аргументом команды.
+          encode() { V="$1" node -e 'process.stdout.write(encodeURIComponent(process.env.V))'; }
+          # Маска ставится на конкретную строку: на percent-encoded форму она не
+          # распространяется, а в $GITHUB_ENV уходит именно закодированная. Без
+          # этой строки пароль в закодированном виде попал бы в журнал при любом
+          # выводе строки подключения (упавший тест, отладочный вывод pg).
+          mask_encoded() {
+            local enc
+            enc="$(encode "$1")"
+            [[ "$enc" == "$1" ]] || echo "::add-mask::$enc"
+            printf '%s' "$enc"
+          }
+          {
+            echo "TEST_DATABASE_URL_MIGRATOR=postgresql://context_owner:context_ci_ephemeral@${host}/${db}"
+            echo "TEST_DATABASE_URL_API=postgresql://context_api:$(mask_encoded "$DB_PASSWORD_API")@${host}/${db}"
+            echo "TEST_DATABASE_URL_WORKER=postgresql://context_worker:$(mask_encoded "$DB_PASSWORD_WORKER")@${host}/${db}"
+            echo "TEST_DATABASE_URL_EVALUATOR=postgresql://context_evaluator:$(mask_encoded "$DB_PASSWORD_EVALUATOR")@${host}/${db}"
+          } >> "$GITHUB_ENV"
+
+      - name: Тесты на реальной базе
+        # Набор сам пересоздаёт схему тестовой базы и идёт под runtime-ролями.
+        # Демонстрационные данные (db:seed:demo) в CI не создаются.
+        env:
+          APP_ENV: test
+          NODE_ENV: test
+        run: npm run test:integration
+
+  # Сборка образов проверяется, но никуда не публикуется.
+  images:
+    name: Сборка образов
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Версия Node из .nvmrc
+        run: echo "NODE_VERSION=$(cat .nvmrc)" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Образ API
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          file: infra/docker/api.Dockerfile
+          build-args: NODE_VERSION=${{ env.NODE_VERSION }}
+          push: false
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Образ worker
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          file: infra/docker/worker.Dockerfile
+          build-args: NODE_VERSION=${{ env.NODE_VERSION }}
+          push: false
+          cache-from: type=gha,scope=worker
+          cache-to: type=gha,mode=max,scope=worker
+
+      - name: Образ web
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          file: infra/docker/web.Dockerfile
+          build-args: |
+            NODE_VERSION=${{ env.NODE_VERSION }}
+            API_INTERNAL_URL=http://api:3001
+          push: false
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web

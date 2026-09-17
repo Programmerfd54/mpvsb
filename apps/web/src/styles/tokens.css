@@ -1,0 +1,172 @@
+/*
+ * Семантические токены интерфейса.
+ *
+ * Палитра тёплая и светлая: основной фон — не белый, читаемые карточки — белые.
+ * Значения взяты из раздела 02.2 ТЗ. Пары текст/фон рассчитаны на контраст
+ * не меньше 4.5:1 (обычный текст) и 3:1 (крупный текст и значимые контуры).
+ *
+ * Декоративные оттенки (peach/lavender/sky) используются как фон; текст и иконки
+ * на них берут парный «ink»-цвет, а не сам оттенок.
+ */
+
+:root {
+  /* Поверхности */
+  --bg-app: #f7f5f0;
+  --bg-surface: #ffffff;
+  --bg-muted: #eeece6;
+  --bg-inset: #f4f2ec;
+  --bg-hover: #f9f8f4;
+  --bg-sidebar: rgba(251, 250, 246, 0.72);
+  --bg-glass: rgba(250, 249, 245, 0.78);
+  --bg-overlay: rgba(36, 40, 33, 0.32);
+
+  /* Текст */
+  --text-primary: #242821;
+  --text-secondary: #596255;
+  /* Только для текста от 14px на белом (4.5:1) */
+  --text-tertiary: #6b7367;
+  --text-on-accent: #ffffff;
+  --text-on-hero: #ffffff;
+  /*
+   * Текст на hero-градиенте. Светлый конец градиента (--hero-to) сам по себе
+   * даёт #cfe3d6 только 4.5:1, поэтому оттенок осветлён, а на .hero-surface
+   * лежит лёгкая тёмная вуаль: вместе выходит ≥5.8:1 на обоих концах.
+   */
+  --text-on-hero-muted: #dcebe1;
+  /* Вуаль hero: держит контраст текста на светлом конце градиента */
+  --hero-veil: rgba(19, 36, 29, 0.18);
+
+  /* Границы */
+  --border-subtle: #dddcd3;
+  --border-strong: #c3c2b6;
+  --border-hairline: rgba(36, 40, 33, 0.07);
+  --border-control: rgba(36, 40, 33, 0.16);
+  --border-control-hover: rgba(36, 40, 33, 0.28);
+
+  /* Акцент */
+  --accent: #35594a;
+  --accent-hover: #284737;
+  --accent-soft: #e7eee5;
+  --accent-soft-hover: #dae6d7;
+  --accent-soft-border: #c9dcc6;
+  --accent-ink: #35594a;
+
+  /* Hero-поверхность: одна на страницу максимум */
+  --hero-from: #2f5243;
+  --hero-to: #3f6b58;
+  --hero-gradient: linear-gradient(135deg, var(--hero-from) 0%, var(--hero-to) 100%);
+
+  /* Декоративные тинты: фон / парный цвет текста и иконки (≥5:1) */
+  --peach-soft: #f5e0d0;
+  --peach-ink: #8a4a24;
+  --lavender-soft: #e8e1f6;
+  --lavender-ink: #5b4394;
+  --sky-soft: #ddecf1;
+  --sky-ink: #245d73;
+
+  /* Состояния */
+  --success-text: #285a36;
+  --success-soft: #e4f1e6;
+  --warning-text: #805013;
+  --warning-soft: #faeedd;
+  --danger-text: #a52e32;
+  --danger-soft: #fae3e3;
+  --info-text: #2a5574;
+  --info-soft: #e2eef6;
+
+  --focus-ring: #3165a9;
+  /*
+   * Цвет кольца отдельным токеном: кнопки и поля собирают кольцо утилитой
+   * ring-* и сохраняют собственную тень варианта, а готовое значение
+   * --focus-halo остаётся для мест, где тень варианта не нужна.
+   */
+  --focus-halo-color: rgba(49, 101, 169, 0.18);
+  --focus-halo: 0 0 0 4px var(--focus-halo-color);
+
+  /* Геометрия */
+  --radius-control: 12px;
+  --radius-nested: 16px;
+  --radius-panel: 20px;
+  --radius-card: 24px;
+  --radius-hero: 32px;
+  --radius-pill: 9999px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* Тени мягкие: глубина создаётся светом, а не тёмной обводкой */
+  --shadow-xs: 0 1px 2px rgba(48, 55, 42, 0.06);
+  --shadow-card: 0 1px 2px rgba(48, 55, 42, 0.04), 0 8px 30px rgba(48, 55, 42, 0.06);
+  --shadow-raised: 0 2px 4px rgba(48, 55, 42, 0.05), 0 14px 40px rgba(48, 55, 42, 0.11);
+  --shadow-overlay: 0 4px 12px rgba(48, 55, 42, 0.08), 0 28px 70px rgba(48, 55, 42, 0.2);
+  --shadow-primary:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 1px 2px rgba(31, 52, 43, 0.25),
+    0 6px 16px -6px rgba(53, 89, 74, 0.55);
+
+  /* Размеры */
+  --control-height: 44px;
+  --control-height-sm: 36px;
+  --control-height-lg: 48px;
+  --sidebar-width: 248px;
+  --sidebar-collapsed: 76px;
+  --topbar-height: 64px;
+  --content-max: 1320px;
+  --reading-max: 72ch;
+
+  /* Движение */
+  --motion-fast: 140ms;
+  --motion-medium: 200ms;
+  --motion-slow: 240ms;
+  --easing: cubic-bezier(0.2, 0, 0.1, 1);
+  --easing-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/*
+ * Уважение к системной настройке уменьшенного движения.
+ * Переходы не убираются полностью — они становятся мгновенными,
+ * чтобы состояние оставалось понятным.
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 1ms;
+    --motion-medium: 1ms;
+    --motion-slow: 1ms;
+  }
+
+  /*
+   * Индикаторы выполнения (.ui-spinner) исключены: это не украшение, а
+   * единственный признак того, что операция идёт. Остановленный на одном кадре
+   * спиннер выглядит как сломанная картинка, поэтому он продолжает вращаться.
+   */
+  *:not(.ui-spinner):not(.ui-spinner *),
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .ui-spinner {
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Повышенный контраст: усиливаем границы, не меняя смысла цвета */
+@media (prefers-contrast: more) {
+  :root {
+    --border-subtle: #9a9a8c;
+    --border-strong: #6f6f62;
+    --border-hairline: rgba(36, 40, 33, 0.3);
+    --border-control: rgba(36, 40, 33, 0.5);
+    --text-secondary: #43483f;
+    --text-tertiary: #43483f;
+  }
+}

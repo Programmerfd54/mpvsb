@@ -1,0 +1,25 @@
+{
+  "name": "@context/domain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Чистые правила предметной области: переходы состояний, разрешения, режимы.",
+  "type": "commonjs",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@context/config": "*",
+    "@types/node": "24.13.5",
+    "typescript": "6.0.3"
+  }
+}

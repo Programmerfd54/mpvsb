@@ -1,0 +1,45 @@
+# Локальная разработка и integration-тесты. Не является production-конфигурацией.
+name: context-platform
+
+services:
+  postgres:
+    image: postgres:18
+    container_name: context-postgres
+    restart: unless-stopped
+    environment:
+      # Значения только для локальной синтетической среды.
+      POSTGRES_USER: context_owner
+      POSTGRES_PASSWORD: context_local_dev
+      POSTGRES_DB: context
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale-provider=icu --icu-locale=ru-RU'
+    ports:
+      - '55442:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U context_owner -d context']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  postgres-test:
+    image: postgres:18
+    container_name: context-postgres-test
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: context_owner
+      POSTGRES_PASSWORD: context_local_dev
+      POSTGRES_DB: context_test
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale-provider=icu --icu-locale=ru-RU'
+    ports:
+      - '55443:5432'
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U context_owner -d context_test']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  postgres-data:

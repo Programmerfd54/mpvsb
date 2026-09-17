@@ -1,0 +1,34 @@
+# Контекст сборки образов — корень монорепозитория (infra/docker/*.Dockerfile).
+# В образ не попадают секреты, локальные зависимости и результаты прошлых сборок:
+# зависимости ставятся заново по package-lock.json, код собирается внутри образа.
+
+# Секреты и локальное окружение.
+.env
+.env.*
+!.env.example
+**/*.pem
+**/*.key
+
+# Зависимости и результаты сборки хоста (другая платформа, другие бинарники).
+**/node_modules
+**/dist
+**/.next
+**/coverage
+**/*.tsbuildinfo
+packages/database/generated
+
+# Отчёты тестов, скриншоты, резервные копии.
+playwright-report
+test-results
+**/*.dump
+backups
+
+# Служебное окружение разработки и документация — не нужны для запуска.
+.git
+.github
+.claude
+.DS_Store
+**/__pycache__
+deliverables
+docs
+PROMPT_FOR_CLAUDE.md

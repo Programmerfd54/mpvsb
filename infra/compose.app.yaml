@@ -1,0 +1,182 @@
+# Запуск api/worker/web из образов поверх отдельной базы данных.
+#
+# Это не production-манифест: здесь нет TLS, reverse proxy и хранилища секретов.
+# Он описывает порядок запуска, роли БД и проверки состояния так же, как это
+# должно выглядеть в оркестраторе (ТЗ 06.9, 12.6).
+#
+# Значений секретов в репозитории нет. Подключения и ключи приходят из env-файла,
+# который не коммитится:
+#
+#   cp infra/app.env.example .env.app        # заполнить подключения и ключи
+#   docker compose -f infra/compose.app.yaml --env-file .env.app build
+#   docker compose -f infra/compose.app.yaml --env-file .env.app run --rm migrate
+#   docker compose -f infra/compose.app.yaml --env-file .env.app up -d
+#
+# Миграции — отдельная одноразовая команда под ролью владельца схемы (migrator).
+# Приложение работает runtime-ролями без DDL и без BYPASSRLS: api, worker,
+# evaluator. Сервис api ждёт успешного завершения миграции, а не «примерно».
+
+name: context-app
+
+# Версия Node дублирует .nvmrc: compose не умеет читать файл. Сборка образа
+# сверяет значение с .nvmrc и падает при расхождении, поэтому копия не разъедется молча.
+x-node-version: &node-version '24.21.0'
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '3'
+
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  logging: *logging
+
+services:
+  # Одноразовая команда: применяет SQL-миграции, создаёт runtime-роли и схему очереди.
+  # Запускается до выката приложения и завершается. Приложение этой ролью не работает.
+  migrate:
+    <<: *hardening
+    image: ${API_IMAGE:-context-api:local}
+    build:
+      context: ..
+      dockerfile: infra/docker/api.Dockerfile
+      args:
+        NODE_VERSION: *node-version
+    working_dir: /app
+    command: ['node', '/app/packages/database/dist/cli/migrate.js']
+    depends_on:
+      # Профиль local-db поднимает базу здесь же: без ожидания healthcheck
+      # миграция стартовала бы раньше готовности сервера. required: false —
+      # при внешней базе сервиса postgres в запуске нет, и это не ошибка.
+      postgres:
+        condition: service_healthy
+        required: false
+    read_only: true
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      NODE_ENV: production
+      # Владелец схемы. Строка подключения и пароли ролей — только из окружения.
+      DATABASE_URL_MIGRATOR: ${DATABASE_URL_MIGRATOR:?нужна строка подключения владельца схемы}
+      DB_PASSWORD_API: ${DB_PASSWORD_API:?нужен пароль роли context_api}
+      DB_PASSWORD_WORKER: ${DB_PASSWORD_WORKER:?нужен пароль роли context_worker}
+      DB_PASSWORD_EVALUATOR: ${DB_PASSWORD_EVALUATOR:?нужен пароль роли context_evaluator}
+    restart: 'no'
+    tmpfs:
+      - /tmp
+
+  api:
+    <<: *hardening
+    image: ${API_IMAGE:-context-api:local}
+    build:
+      context: ..
+      dockerfile: infra/docker/api.Dockerfile
+      args:
+        NODE_VERSION: *node-version
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    read_only: true
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      API_HOST: 0.0.0.0
+      API_PORT: 3001
+      WEB_ORIGIN: ${WEB_ORIGIN:?нужен внешний origin интерфейса}
+      DATABASE_URL_API: ${DATABASE_URL_API:?нужна строка подключения роли context_api}
+      TOKEN_HASH_SECRET: ${TOKEN_HASH_SECRET:?нужен секрет HMAC для хэшей токенов}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      REPORT_PROVIDER: ${REPORT_PROVIDER:-fake}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      # Наружу API выходит через общий reverse proxy вместе с web; публикация
+      # порта нужна только для локальной проверки, поэтому она привязана к
+      # loopback хоста: иначе сервис без TLS оказался бы во всей сети машины.
+      - '127.0.0.1:${API_PUBLISHED_PORT:-3101}:3001'
+    restart: unless-stopped
+    tmpfs:
+      - /tmp
+
+  # Публичного ingress у worker нет: он общается только с базой и очередью.
+  worker:
+    <<: *hardening
+    image: ${WORKER_IMAGE:-context-worker:local}
+    build:
+      context: ..
+      dockerfile: infra/docker/worker.Dockerfile
+      args:
+        NODE_VERSION: *node-version
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    read_only: true
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      DATABASE_URL_WORKER: ${DATABASE_URL_WORKER:?нужна строка подключения роли context_worker}
+      REPORT_PROVIDER: ${REPORT_PROVIDER:-fake}
+      REPORT_PROVIDER_TIMEOUT_MS: ${REPORT_PROVIDER_TIMEOUT_MS:-60000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    restart: unless-stopped
+    tmpfs:
+      - /tmp
+
+  web:
+    <<: *hardening
+    image: ${WEB_IMAGE:-context-web:local}
+    build:
+      context: ..
+      dockerfile: infra/docker/web.Dockerfile
+      args:
+        NODE_VERSION: *node-version
+        # Внутренний адрес API попадает в манифест rewrites при сборке.
+        API_INTERNAL_URL: http://api:3001
+    depends_on:
+      api:
+        condition: service_healthy
+    # `next start` пишет в .next/cache (кэш изображений и fetch) и в /tmp, поэтому
+    # read_only дополнен tmpfs на эти каталоги: файловая система образа остаётся
+    # неизменяемой, а записи живут только в памяти контейнера. После перехода на
+    # output: 'standalone' каталог кэша останется тем же.
+    read_only: true
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    ports:
+      # Только loopback хоста: снаружи web доступен через общий reverse proxy.
+      - '127.0.0.1:${WEB_PUBLISHED_PORT:-3100}:3000'
+    restart: unless-stopped
+    tmpfs:
+      - /tmp
+      - /app/apps/web/.next/cache
+
+  # Локальная отдельная база для проверки манифеста. Профиль выключен по умолчанию:
+  # при работе поверх внешней базы этот сервис не нужен, а базы разработки и
+  # integration-тестов описаны в infra/compose.yaml и этим файлом не управляются.
+  postgres:
+    profiles: ['local-db']
+    image: postgres:18
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-context_owner}
+      # Профиль local-db требует POSTGRES_PASSWORD в env-файле; проверка значения
+      # оставлена самому PostgreSQL, чтобы обязательная переменная выключенного
+      # профиля не мешала обычному запуску.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+      POSTGRES_DB: ${POSTGRES_DB:-context}
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale-provider=icu --icu-locale=ru-RU'
+    ports:
+      # Только loopback хоста: база профиля проверки не должна быть видна в сети.
+      - '127.0.0.1:${POSTGRES_PUBLISHED_PORT:-55444}:5432'
+    volumes:
+      - app-postgres-data:/var/lib/postgresql
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-context_owner} -d ${POSTGRES_DB:-context}']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    logging: *logging
+
+volumes:
+  app-postgres-data:

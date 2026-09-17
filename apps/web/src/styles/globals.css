@@ -1,0 +1,529 @@
+@import 'tailwindcss';
+@import './tokens.css';
+
+/*
+ * Tailwind 4: токены объявляются через @theme, чтобы классы вроде
+ * bg-surface и text-secondary опирались на те же переменные, что и CSS.
+ */
+@theme inline {
+  --font-sans: var(--font-ui), ui-sans-serif, system-ui, sans-serif;
+
+  --color-app: var(--bg-app);
+  --color-surface: var(--bg-surface);
+  --color-muted: var(--bg-muted);
+  --color-inset: var(--bg-inset);
+  --color-hover: var(--bg-hover);
+
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-tertiary: var(--text-tertiary);
+  --color-on-accent: var(--text-on-accent);
+  --color-on-hero: var(--text-on-hero);
+  --color-on-hero-muted: var(--text-on-hero-muted);
+
+  --color-subtle: var(--border-subtle);
+  --color-strong: var(--border-strong);
+  --color-hairline: var(--border-hairline);
+  --color-control: var(--border-control);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-soft-border: var(--accent-soft-border);
+  --color-accent-ink: var(--accent-ink);
+
+  --color-peach: var(--peach-soft);
+  --color-peach-ink: var(--peach-ink);
+  --color-lavender: var(--lavender-soft);
+  --color-lavender-ink: var(--lavender-ink);
+  --color-sky: var(--sky-soft);
+  --color-sky-ink: var(--sky-ink);
+
+  --color-success: var(--success-text);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning-text);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger-text);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info-text);
+  --color-info-soft: var(--info-soft);
+  --color-focus: var(--focus-ring);
+
+  --radius-control: var(--radius-control);
+  --radius-nested: var(--radius-nested);
+  --radius-panel: var(--radius-panel);
+  --radius-card: var(--radius-card);
+  --radius-hero: var(--radius-hero);
+
+  --shadow-xs: var(--shadow-xs);
+  --shadow-card: var(--shadow-card);
+  --shadow-raised: var(--shadow-raised);
+  --shadow-overlay: var(--shadow-overlay);
+  --shadow-primary: var(--shadow-primary);
+
+  --ease-standard: var(--easing);
+  --ease-out-soft: var(--easing-out);
+}
+
+/*
+ * Все базовые правила — в @layer base. Утилиты Tailwind лежат в
+ * @layer utilities и должны их перебивать: неслоёные правила побеждали
+ * любые утилиты, из-за чего текст основной кнопки становился тёмным.
+ */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    /*
+     * Моноширинные цифры включаются точечно (.tabular, ячейки align="right",
+     * StatCard, Pagination, счётчики): в обычном тексте и датах они
+     * разрежены и выбиваются из Manrope.
+     */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg-app);
+    color: var(--text-primary);
+    font-family: var(--font-ui), ui-sans-serif, system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /*
+   * Видимый фокус клавиатуры обязателен. Кольцо рисуется поверх любых фонов
+   * и не убирается ни одним компонентом.
+   */
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    margin: 0;
+    font-weight: 650;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+  }
+
+  h1 {
+    font-size: clamp(26px, 2.3vw, 32px);
+    line-height: 1.15;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  h2 {
+    font-size: clamp(18px, 1.4vw, 20px);
+    line-height: 1.3;
+  }
+
+  h3 {
+    font-size: 16px;
+    line-height: 1.35;
+  }
+
+  p {
+    margin: 0;
+  }
+
+  a {
+    color: var(--accent);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    transition: color var(--motion-fast) var(--easing);
+  }
+
+  a:hover {
+    color: var(--accent-hover);
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  ::selection {
+    background: #cfe3d6;
+    color: var(--text-primary);
+  }
+
+  /*
+   * Нативные select получают ту же высоту, радиус и стрелку, что компонент
+   * Select: страницы, ещё не перешедшие на компонент, выглядят согласованно.
+   */
+  select:not([multiple]):not([size]) {
+    appearance: none;
+    -webkit-appearance: none;
+    min-height: var(--control-height);
+    padding-right: 40px;
+    background-color: var(--bg-surface);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23596255' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    background-size: 16px 16px;
+    border-color: var(--border-control);
+    box-shadow: var(--shadow-xs);
+    transition:
+      border-color var(--motion-fast) var(--easing),
+      box-shadow var(--motion-fast) var(--easing);
+  }
+
+  select:not([multiple]):not([size]):hover {
+    border-color: var(--border-control-hover);
+  }
+
+  /*
+   * Специфичность фокусного правила не ниже, чем у правила вида нативного
+   * select выше: иначе тень и граница фокуса у select молча не появляются.
+   */
+  input:focus-visible,
+  select:focus-visible,
+  select:not([multiple]):not([size]):focus-visible,
+  textarea:focus-visible {
+    border-color: var(--focus-ring);
+    /* Кольцо добавляется к тени поля, а не заменяет её. */
+    box-shadow: var(--shadow-xs), var(--focus-halo);
+  }
+
+  code {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.9em;
+  }
+
+  hr {
+    border: 0;
+    border-top: 1px solid var(--border-hairline);
+  }
+}
+
+@layer components {
+  /* Ссылка «перейти к содержимому» для клавиатурной навигации */
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 100;
+    padding: 12px 16px;
+    background: var(--bg-surface);
+    color: var(--accent);
+    border-radius: var(--radius-control);
+    box-shadow: var(--shadow-raised);
+  }
+
+  .skip-link:focus {
+    left: 16px;
+    top: 16px;
+  }
+
+  /*
+   * Декоративный фон приложения: мягкие пятна света. Не несёт смысла,
+   * не перехватывает клики, текст всегда лежит на непрозрачных карточках.
+   */
+  .app-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(42rem 30rem at -6% -10%, rgba(245, 224, 208, 0.55), transparent 70%),
+      radial-gradient(38rem 28rem at 104% -8%, rgba(221, 236, 241, 0.6), transparent 70%),
+      radial-gradient(34rem 26rem at 78% 12%, rgba(232, 225, 246, 0.35), transparent 72%);
+  }
+
+  /* Стекло навигационных поверхностей с непрозрачным запасным вариантом */
+  .surface-glass {
+    background: #f9f8f4;
+  }
+
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .surface-glass {
+      background: var(--bg-glass);
+      -webkit-backdrop-filter: saturate(1.4) blur(16px);
+      backdrop-filter: saturate(1.4) blur(16px);
+    }
+  }
+
+  .hero-surface {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    background: var(--hero-gradient);
+    color: var(--text-on-hero);
+  }
+
+  .hero-surface::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(28rem 16rem at 100% 0%, rgba(255, 255, 255, 0.14), transparent 70%),
+      radial-gradient(20rem 14rem at 0% 100%, rgba(207, 227, 214, 0.12), transparent 70%),
+      linear-gradient(0deg, var(--hero-veil), var(--hero-veil));
+  }
+
+  .hero-surface a {
+    color: var(--text-on-hero);
+  }
+
+  /* Скелетон: мягкий блик. При reduced motion — статичная заливка. */
+  .skeleton {
+    background-color: var(--bg-muted);
+    background-image: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.55) 50%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    background-size: 200% 100%;
+    background-repeat: no-repeat;
+    animation: skeleton-shimmer 1.6s ease-in-out infinite;
+  }
+
+  /* Radix: оверлей, диалог, боковые панели, всплывающие меню */
+  .ui-overlay[data-state='open'] {
+    animation: overlay-in 180ms var(--easing) both;
+  }
+
+  .ui-overlay[data-state='closed'] {
+    animation: overlay-out 140ms var(--easing) both;
+  }
+
+  .ui-dialog[data-state='open'] {
+    animation: dialog-in 180ms var(--easing-out) both;
+  }
+
+  .ui-dialog[data-state='closed'] {
+    animation: dialog-out 120ms var(--easing) both;
+  }
+
+  .ui-sheet-right[data-state='open'] {
+    animation: sheet-in-right 220ms var(--easing-out) both;
+  }
+
+  .ui-sheet-right[data-state='closed'] {
+    animation: sheet-out-right 180ms var(--easing) both;
+  }
+
+  .ui-sheet-left[data-state='open'] {
+    animation: sheet-in-left 220ms var(--easing-out) both;
+  }
+
+  .ui-sheet-left[data-state='closed'] {
+    animation: sheet-out-left 180ms var(--easing) both;
+  }
+
+  .ui-popover {
+    transform-origin: var(
+      --radix-popover-content-transform-origin,
+      var(--radix-dropdown-menu-content-transform-origin, top)
+    );
+  }
+
+  .ui-popover[data-state='open'] {
+    animation: popover-in 150ms var(--easing-out) both;
+  }
+
+  .ui-popover[data-state='closed'] {
+    animation: popover-out 100ms var(--easing) both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton {
+      animation: none !important;
+      background-image: none;
+    }
+
+    .ui-overlay,
+    .ui-dialog,
+    .ui-sheet-right,
+    .ui-sheet-left,
+    .ui-popover {
+      animation-name: none !important;
+    }
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .reading {
+    max-width: var(--reading-max);
+  }
+
+  .eyebrow {
+    font-size: 12px;
+    line-height: 1.2;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 150% 0;
+  }
+  100% {
+    background-position: -50% 0;
+  }
+}
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes overlay-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes dialog-out {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.98);
+  }
+}
+
+@keyframes sheet-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes sheet-out-right {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes sheet-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes sheet-out-left {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes popover-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes popover-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/*
+ * Единственное намеренно неслоёное правило: место под стрелку нативного select
+ * должно сохраняться даже при утилите px-* на странице, иначе текст наезжает
+ * на стрелку.
+ */
+select:not([multiple]):not([size]) {
+  padding-right: 40px;
+}
+
+/* Печатная версия: без навигации и кнопок */
+@media print {
+  .no-print,
+  .app-backdrop {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff;
+    font-size: 12pt;
+  }
+
+  .report-layout {
+    display: block !important;
+  }
+
+  .print-full {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+}

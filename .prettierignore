@@ -1,0 +1,18 @@
+node_modules
+dist
+.next
+coverage
+deliverables
+packages/database/generated
+
+# Документация пакета ведётся модульно и собирается scripts/build_spec.py.
+# Prettier её не переформатирует: это исходники пользователя, а не код.
+*.md
+docs/
+README.md
+CLAUDE.md
+package-lock.json
+
+# Генерируется Next.js при сборке.
+apps/web/next-env.d.ts
+apps/web/.next
