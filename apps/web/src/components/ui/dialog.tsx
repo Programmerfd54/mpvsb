@@ -53,7 +53,7 @@ export function ConfirmDialog({
       <RadixDialog.Portal>
         <RadixDialog.Overlay className={OVERLAY_CLASS} />
         <RadixDialog.Content
-          className="ui-dialog fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100dvh-32px)] w-[min(520px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-y-auto rounded-[var(--radius-card)] border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-6 shadow-[var(--shadow-overlay)] focus:outline-none"
+          className="ui-dialog fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100dvh-32px)] w-[min(520px,calc(100vw-32px))] flex-col overflow-y-auto rounded-[var(--radius-card)] border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-6 shadow-[var(--shadow-overlay)] focus:outline-none"
           onOpenAutoFocus={(event) => {
             // Фокус ставим на «Отмена»: подтверждение требует осознанного выбора,
             // а случайный Enter не должен запускать необратимое действие.
@@ -75,20 +75,22 @@ export function ConfirmDialog({
               : undefined
           }
         >
-          <span
-            aria-hidden="true"
-            className={cx(
-              'mb-4 grid size-11 place-items-center rounded-full [&_svg]:size-5',
-              destructive
-                ? 'bg-[var(--danger-soft)] text-[var(--danger-text)]'
-                : 'bg-[var(--accent-soft)] text-[var(--accent-ink)]',
-            )}
-          >
-            {destructive ? <TriangleAlert strokeWidth={1.75} /> : <Info strokeWidth={1.75} />}
-          </span>
-          <RadixDialog.Title className="text-lg font-semibold leading-snug">
-            {title}
-          </RadixDialog.Title>
+          <div className="flex items-center gap-3">
+            <span
+              aria-hidden="true"
+              className={cx(
+                'grid size-11 shrink-0 place-items-center rounded-full [&_svg]:size-5',
+                destructive
+                  ? 'bg-[var(--danger-soft)] text-[var(--danger-text)]'
+                  : 'bg-[var(--accent-soft)] text-[var(--accent-ink)]',
+              )}
+            >
+              {destructive ? <TriangleAlert strokeWidth={1.75} /> : <Info strokeWidth={1.75} />}
+            </span>
+            <RadixDialog.Title className="text-lg font-semibold leading-snug">
+              {title}
+            </RadixDialog.Title>
+          </div>
           <RadixDialog.Description className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
             {description}
           </RadixDialog.Description>
@@ -109,9 +111,9 @@ export function ConfirmDialog({
 
           {children ? <div className="mt-4">{children}</div> : null}
 
-          <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
             <RadixDialog.Close asChild>
-              <Button variant="secondary" data-safe-focus>
+              <Button variant="secondary" data-safe-focus disabled={loading}>
                 {cancelLabel}
               </Button>
             </RadixDialog.Close>

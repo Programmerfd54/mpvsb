@@ -318,6 +318,10 @@
     animation: overlay-out 140ms var(--easing) both;
   }
 
+  .ui-dialog {
+    transform: translate(-50%, -50%);
+  }
+
   .ui-dialog[data-state='open'] {
     animation: dialog-in 180ms var(--easing-out) both;
   }

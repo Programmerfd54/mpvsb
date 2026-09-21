@@ -149,6 +149,7 @@ export function AuthCard({
   title,
   description,
   children,
+  presentation = 'default',
 }: {
   icon?: ReactNode;
   /** Классы тинта плашки иконки (см. TINT_CLASS). */
@@ -156,34 +157,74 @@ export function AuthCard({
   title: string;
   description?: ReactNode;
   children?: ReactNode;
+  /** Более выразительная композиция для первого экрана приглашения. */
+  presentation?: 'default' | 'invitation';
 }) {
+  const invitation = presentation === 'invitation';
+
   return (
-    <div className="relative min-h-dvh px-4 py-10">
+    <div className={cx('relative min-h-dvh px-4', invitation ? 'py-8 sm:py-12' : 'py-10')}>
       <AppBackdrop />
       <main
         id="main"
-        className="relative z-[1] mx-auto flex min-h-[calc(100dvh-5rem)] w-full max-w-[640px] flex-col justify-center gap-6"
+        className={cx(
+          'relative z-[1] mx-auto flex w-full flex-col justify-center',
+          invitation
+            ? 'min-h-[calc(100dvh-6rem)] max-w-[720px] gap-8'
+            : 'min-h-[calc(100dvh-5rem)] max-w-[640px] gap-6',
+        )}
       >
-        <div className="flex items-center justify-center gap-2.5">
-          <Logomark />
-          <span className="text-[17px] font-bold tracking-[-0.01em]">Контекст</span>
+        <div className={cx('flex items-center justify-center', invitation ? 'gap-3' : 'gap-2.5')}>
+          <Logomark size={invitation ? 42 : 32} />
+          <span
+            className={cx(
+              'font-bold tracking-[-0.01em]',
+              invitation ? 'text-[20px]' : 'text-[17px]',
+            )}
+          >
+            Контекст
+          </span>
         </div>
 
-        <div className="rounded-[var(--radius-card)] border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-6 shadow-[var(--shadow-card)] sm:p-8">
-          {icon ? (
-            <span
-              aria-hidden="true"
+        <div
+          className={cx(
+            'rounded-[var(--radius-card)] border border-[var(--border-hairline)] bg-[var(--bg-surface)] shadow-[var(--shadow-card)]',
+            invitation ? 'p-7 sm:p-10' : 'p-6 sm:p-8',
+          )}
+        >
+          <div className={cx(invitation && 'flex items-center gap-4 sm:gap-5')}>
+            {icon ? (
+              <span
+                aria-hidden="true"
+                className={cx(
+                  'grid shrink-0 place-items-center rounded-[var(--radius-nested)]',
+                  invitation ? 'size-14 [&_svg]:size-7' : 'mb-5 size-12 [&_svg]:size-6',
+                  tintClassName,
+                )}
+              >
+                {icon}
+              </span>
+            ) : null}
+            <h1
               className={cx(
-                'mb-5 grid size-12 place-items-center rounded-[var(--radius-nested)] [&_svg]:size-6',
-                tintClassName,
+                'leading-tight',
+                invitation
+                  ? 'text-[clamp(24px,3.2vw,32px)] tracking-[-0.025em] sm:whitespace-nowrap'
+                  : 'text-[clamp(22px,2vw,26px)]',
               )}
             >
-              {icon}
-            </span>
-          ) : null}
-          <h1 className="text-[clamp(22px,2vw,26px)] leading-tight">{title}</h1>
+              {title}
+            </h1>
+          </div>
           {description ? (
-            <div className="mt-3 text-[15px] leading-relaxed text-[var(--text-secondary)]">
+            <div
+              className={cx(
+                'text-[var(--text-secondary)]',
+                invitation
+                  ? 'mt-6 max-w-[62ch] text-[17px] leading-[1.65]'
+                  : 'mt-3 text-[15px] leading-relaxed',
+              )}
+            >
               {description}
             </div>
           ) : null}

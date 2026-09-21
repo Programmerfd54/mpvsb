@@ -47,6 +47,7 @@ import {
   ORG_MODE_LABELS,
   READINESS_STATE_LABELS,
 } from '../../_lib/labels';
+import { AccessRequest } from './_components/access-request';
 
 type OrgTab = 'details' | 'access' | 'readiness' | 'data' | 'log';
 
@@ -377,12 +378,13 @@ export default function AdminOrganizationPage({ params }: { params: Promise<{ or
         </TabPanel>
 
         <TabPanel value="data">
-          <Card>
+          <AccessRequest organizationId={orgId} />
+          <Card className="mt-5">
             <CardHeader
               icon={<FolderLock aria-hidden="true" strokeWidth={1.75} />}
               tint="neutral"
               title="Данные организации"
-              description="Задания на удаление и экспорт, временный доступ администратора к содержанию."
+              description="Задания на удаление и экспорт данных организации."
             />
             <CardBody>
               <Callout
@@ -391,12 +393,9 @@ export default function AdminOrganizationPage({ params }: { params: Promise<{ or
                 title="Раздел ещё не подключён к API"
               >
                 <p>
-                  По ТЗ здесь должны быть задания на удаление и экспорт данных организации со
-                  сроками и статусом, а также форма «Запросить временный доступ» (причина, цель,
-                  срок; выдаёт уполномоченный владелец организации). Соответствующие эндпоинты
-                  администратора сейчас не реализованы — эта часть делается отдельной задачей на
-                  стороне backend. Пока показывать здесь нечего: ни фиктивных заданий, ни
-                  неработающей формы.
+                  Задания на удаление и экспорт данных организации со сроками и статусом пока не
+                  подключены. Запрос временного доступа доступен выше и отправляется через
+                  действующий API; решение принимает владелец организации.
                 </p>
               </Callout>
             </CardBody>

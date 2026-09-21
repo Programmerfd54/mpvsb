@@ -1,6 +1,5 @@
 'use client';
 
-import { MailOpen } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -49,11 +48,7 @@ export default function ParticipatePage() {
   }
 
   return (
-    <AuthCard
-      icon={<MailOpen aria-hidden="true" strokeWidth={1.75} />}
-      title="Вы получили приглашение пройти оценку"
-      description="На следующем шаге вы увидите, кто проводит оценку, что предстоит сделать и как будут использованы ваши ответы. Пока вы не нажмёте кнопку, ничего не начнётся."
-    >
+    <AuthCard title="Вы получили приглашение пройти оценку" presentation="invitation">
       {error ? (
         <div className="mt-5">
           <ErrorState
@@ -73,10 +68,12 @@ export default function ParticipatePage() {
         </div>
       ) : null}
 
-      <div className="mt-6">
+      <div className="mx-auto mt-8 w-full max-w-[380px]">
         <Button
           variant="primary"
           size="lg"
+          fullWidth
+          className="h-16 px-8 text-[18px]"
           loading={pending}
           disabled={!token}
           disabledReason={token ? undefined : 'Кнопка станет доступной, когда ссылка будет полной.'}
@@ -85,6 +82,11 @@ export default function ParticipatePage() {
           Открыть приглашение
         </Button>
       </div>
+
+      <p className="mx-auto mt-6 max-w-[62ch] text-center text-[17px] leading-[1.65] text-[var(--text-secondary)]">
+        На следующем шаге вы увидите, кто проводит оценку, что предстоит сделать и как будут
+        использованы ваши ответы.
+      </p>
     </AuthCard>
   );
 }

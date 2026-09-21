@@ -4,7 +4,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { use, useRef, useState } from 'react';
 
-import type { Envelope, ParticipantAttemptDetail, SubmitAttemptResult } from '@context/contracts';
+import type {
+  AnswerResponse,
+  Envelope,
+  MethodItem,
+  ParticipantAttemptDetail,
+  SubmitAttemptResult,
+} from '@context/contracts';
 
 import { ParticipantTopbarInfo } from '@/components/layout/participant-shell';
 import { Button, ButtonLink } from '@/components/ui/button';
@@ -14,6 +20,47 @@ import { Callout, ErrorState, LoadingBlock } from '@/components/ui/states';
 import { notify } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import { useApiMutation, useApiQuery } from '@/lib/query';
+
+function isAnswered(item: MethodItem, answer: AnswerResponse | undefined): boolean {
+  if (!answer || answer.type !== item.type) return false;
+  switch (item.type) {
+    case 'single_choice':
+      return (
+        answer.type === 'single_choice' &&
+        item.options.some((option) => option.id === answer.optionId)
+      );
+    case 'multiple_choice':
+      return (
+        answer.type === 'multiple_choice' &&
+        new Set(answer.optionIds).size === answer.optionIds.length &&
+        answer.optionIds.length >= item.minSelected &&
+        answer.optionIds.length <= item.maxSelected &&
+        answer.optionIds.every((id) => item.options.some((option) => option.id === id))
+      );
+    case 'likert':
+      return answer.type === 'likert' && answer.value >= item.min && answer.value <= item.max;
+    case 'numeric':
+      return (
+        answer.type === 'numeric' &&
+        Number.isFinite(answer.value) &&
+        answer.value >= item.min &&
+        answer.value <= item.max
+      );
+    case 'short_text':
+      return (
+        answer.type === 'short_text' &&
+        answer.text.trim().length > 0 &&
+        answer.text.length <= item.maxLength
+      );
+    case 'situational':
+      return (
+        answer.type === 'situational' &&
+        (item.response.kind === 'single_choice'
+          ? item.response.options.some((option) => option.id === answer.optionId)
+          : Boolean(answer.text?.trim()) && (answer.text?.length ?? 0) <= item.response.maxLength)
+      );
+  }
+}
 
 /**
  * Проверка перед отправкой.
@@ -27,6 +74,7 @@ export default function AttemptReviewPage({ params }: { params: Promise<{ attemp
   const router = useRouter();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const submitButtonRef = useRef<HTMLButtonElement>(null);
+  const submitLock = useRef(false);
 
   const attemptQuery = useApiQuery<Envelope<ParticipantAttemptDetail>>(
     ['participant-attempt', attemptId],
@@ -39,7 +87,14 @@ export default function AttemptReviewPage({ params }: { params: Promise<{ attemp
     { expectedRevision: number },
     Envelope<SubmitAttemptResult>
   >((body) => api.post(`/participant/attempts/${attemptId}/submit`, body), {
+    invalidate: [
+      ['participant-attempt', attemptId],
+      ['participant-attempts'],
+      ['participant-session'],
+      ['participant-completion'],
+    ],
     onSuccess: (result) => {
+      submitLock.current = false;
       setConfirmOpen(false);
       notify.success('Ответы отправлены');
       router.push(
@@ -50,7 +105,10 @@ export default function AttemptReviewPage({ params }: { params: Promise<{ attemp
             : '/participant',
       );
     },
-    onError: () => setConfirmOpen(false),
+    onError: () => {
+      submitLock.current = false;
+      setConfirmOpen(false);
+    },
   });
 
   if (attemptQuery.error?.status === 401) {
@@ -76,8 +134,22 @@ export default function AttemptReviewPage({ params }: { params: Promise<{ attemp
     return <LoadingBlock label="Готовим проверку" />;
   }
 
-  const missing = attempt.items.filter((item) => item.required && !attempt.answers[item.id]);
-  const answered = Object.keys(attempt.answers).length;
+  if (!attempt.canEdit) {
+    return (
+      <ErrorState
+        title="Ответы уже отправлены"
+        description="Повторно редактировать этот тест нельзя."
+        action={<ButtonLink href="/participant">К списку тестов</ButtonLink>}
+      />
+    );
+  }
+
+  const missing = attempt.items.filter(
+    (item) => item.required && !isAnswered(item, attempt.answers[item.id]),
+  );
+  const answered = attempt.items.filter((item) =>
+    isAnswered(item, attempt.answers[item.id]),
+  ).length;
   const submitError = submitMutation.error;
 
   return (
@@ -91,7 +163,22 @@ export default function AttemptReviewPage({ params }: { params: Promise<{ attemp
 
       {submitError ? (
         <div className="mb-5">
-          <Callout tone="danger" role="alert" title="Не удалось отправить ответы">
+          <Callout
+            tone="danger"
+            role="alert"
+            title={
+              submitError.code === 'REVISION_CONFLICT'
+                ? 'Данные изменились в другом окне'
+                : 'Не удалось отправить ответы'
+            }
+            action={
+              submitError.code === 'REVISION_CONFLICT' ? (
+                <Button size="sm" onClick={attemptQuery.refetch}>
+                  Обновить данные
+                </Button>
+              ) : undefined
+            }
+          >
             {submitError.problem.fieldErrors.map((item) => item.message).join('; ') ||
               submitError.problem.title}
           </Callout>
@@ -149,7 +236,9 @@ export default function AttemptReviewPage({ params }: { params: Promise<{ attemp
 
       <ConfirmDialog
         open={confirmOpen}
-        onOpenChange={setConfirmOpen}
+        onOpenChange={(open) => {
+          if (!submitMutation.isPending) setConfirmOpen(open);
+        }}
         title="Отправить ответы?"
         description="После отправки изменить ответы этого теста будет нельзя."
         consequences={[
@@ -158,7 +247,11 @@ export default function AttemptReviewPage({ params }: { params: Promise<{ attemp
         ]}
         confirmLabel="Отправить"
         loading={submitMutation.isPending}
-        onConfirm={() => submitMutation.mutate({ expectedRevision: attempt.revision })}
+        onConfirm={() => {
+          if (submitLock.current || submitMutation.isPending) return;
+          submitLock.current = true;
+          submitMutation.mutate({ expectedRevision: attempt.revision });
+        }}
         returnFocusRef={submitButtonRef}
       />
     </>

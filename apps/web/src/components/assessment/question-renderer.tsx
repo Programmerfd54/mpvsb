@@ -244,8 +244,9 @@ function NumericAnswer({
             text !== '' &&
             event.target.validity.valid &&
             Number.isFinite(event.target.valueAsNumber);
-          setInvalid(!valid);
-          onValidityChange?.(!valid);
+          const invalidDraft = text === '' ? item.required : !valid;
+          setInvalid(invalidDraft);
+          onValidityChange?.(invalidDraft);
           if (valid) onChange({ type: 'numeric', value: event.target.valueAsNumber });
         }}
       />
@@ -256,7 +257,8 @@ function NumericAnswer({
           invalid ? 'text-[var(--danger-text)]' : 'text-[var(--text-secondary)]',
         )}
       >
-        {invalid ? 'Введите число' : 'Число'} от {item.min} до {item.max}
+        {invalid ? (draft === '' ? 'Укажите число' : 'Проверьте диапазон и шаг: число') : 'Число'}{' '}
+        от {item.min} до {item.max}
         {item.unit ? ` ${item.unit}` : ''}. Шаг: {item.step}.
       </p>
     </div>

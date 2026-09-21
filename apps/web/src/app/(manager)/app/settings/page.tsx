@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Database, KeyRound, ShieldCheck } from 'lucide-react';
 
 import { PageHeader } from '@/components/layout/manager-shell';
@@ -18,6 +18,10 @@ type SettingsTab = 'organization' | 'access' | 'data';
 export default function SettingsPage() {
   const session = useSession();
   const [tab, setTab] = useState<SettingsTab>('organization');
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('tab') === 'access') setTab('access');
+  }, []);
 
   if (session.status === 'loading') {
     return <PageSkeleton variant="form" label="Проверяем доступ к настройкам" />;

@@ -24,6 +24,7 @@ import {
   ShellMessage,
   type ShellNavGroup,
 } from '@/components/layout/app-shell';
+import { NotificationBell } from '@/components/layout/notification-bell';
 import { SessionProvider, signOut, useSession } from '@/lib/session';
 
 /**
@@ -123,6 +124,7 @@ function ManagerWorkspace({ children }: { children: ReactNode }) {
   return (
     <>
       <AppShell
+        topbarSlot={<NotificationBell organizationId={organization.organizationId} />}
         navLabel="Разделы кабинета"
         navigation={navigation}
         context={

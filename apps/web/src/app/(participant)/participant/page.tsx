@@ -28,6 +28,10 @@ function contactHref(contact: string | null): string | undefined {
   return undefined;
 }
 
+function isSubmitted(state: ParticipantAttemptSummary['state']): boolean {
+  return state === 'submitted' || state === 'scored' || state === 'scoring_failed';
+}
+
 /**
  * Список методик участника.
  *
@@ -42,6 +46,7 @@ export default function ParticipantHomePage() {
   const attemptsQuery = useApiQuery<Envelope<ParticipantAttemptSummary[]>>(
     ['participant-attempts'],
     '/participant/attempts',
+    { staleTime: 0 },
   );
 
   const error = sessionQuery.error ?? attemptsQuery.error;
@@ -81,17 +86,17 @@ export default function ParticipantHomePage() {
   const session = sessionQuery.data?.data;
   const attempts = attemptsQuery.data?.data;
 
-  if (!session || !attempts) {
+  if (!session || !attempts || attemptsQuery.isFetching) {
     return <LoadingBlock label="Загружаем список тестов" />;
   }
 
-  const completed = attempts.filter(
-    (item) => item.state === 'submitted' || item.state === 'scored',
-  ).length;
-  const nextAttempt = attempts.find(
-    (item) => item.state !== 'submitted' && item.state !== 'scored',
-  );
-  const allDone = attempts.length > 0 && completed === attempts.length;
+  const orderedAttempts = [...attempts].sort((a, b) => a.orderIndex - b.orderIndex);
+  const requiredAttempts = orderedAttempts.filter((item) => item.required);
+  const completed = requiredAttempts.filter((item) => isSubmitted(item.state)).length;
+  const nextAttempt =
+    orderedAttempts.find((item) => item.required && !isSubmitted(item.state)) ??
+    orderedAttempts.find((item) => !isSubmitted(item.state));
+  const allRequiredDone = orderedAttempts.length > 0 && completed === requiredAttempts.length;
 
   return (
     <>
@@ -102,14 +107,17 @@ export default function ParticipantHomePage() {
       />
 
       <header className="mb-6 flex flex-col gap-3">
-        <p className="eyebrow text-[var(--accent)]">Ваше участие</p>
-        <h1>Шаг за шагом, в своём темпе</h1>
+        <h1>Ваши тесты</h1>
         <p className="max-w-prose text-[var(--text-secondary)]">
           Здесь собраны назначенные вам опросы. Можно прерваться и продолжить позже — до окончания
           срока участия.
         </p>
-        {attempts.length > 0 ? (
-          <Progress completed={completed} total={attempts.length} label="Завершено тестов" />
+        {requiredAttempts.length > 0 ? (
+          <Progress
+            completed={completed}
+            total={requiredAttempts.length}
+            label="Обязательных тестов завершено"
+          />
         ) : null}
         <p className="text-sm text-[var(--text-secondary)]">{formatRemaining(session.expiresAt)}</p>
       </header>
@@ -124,22 +132,23 @@ export default function ParticipantHomePage() {
         </Card>
       ) : null}
 
-      {allDone ? (
+      {allRequiredDone ? (
         <div className="mb-5">
           <Callout
             tone="success"
-            title="Все тесты завершены"
+            title="Обязательные тесты завершены"
             action={<ButtonLink href="/participant/done">Что дальше</ButtonLink>}
           >
-            Спасибо за участие. Ответы переданы на обработку.
+            Ответы на обязательные тесты переданы на обработку.
           </Callout>
         </div>
       ) : null}
 
       <Stagger className="flex list-none flex-col gap-4 p-0" as="ul">
-        {attempts.map((attempt, index) => {
-          const done = attempt.state === 'submitted' || attempt.state === 'scored';
+        {orderedAttempts.map((attempt, index) => {
+          const done = isSubmitted(attempt.state);
           const started = attempt.state === 'in_progress';
+          const processingDelayed = attempt.state === 'scoring_failed';
 
           return (
             <StaggerItem key={attempt.attemptId} index={index} as="li">
@@ -162,23 +171,40 @@ export default function ParticipantHomePage() {
                       <div className="min-w-0">
                         <p className="mb-1 text-xs font-medium text-[var(--text-secondary)]">
                           {done
-                            ? 'Завершено'
+                            ? 'Ответы отправлены'
                             : attempt.attemptId === nextAttempt?.attemptId
                               ? 'Следующий шаг'
                               : `Опрос ${index + 1}`}
                         </p>
                         <h2 className="text-base font-semibold">{attempt.title}</h2>
                         <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                          {attempt.itemCount} вопросов ·{' '}
+                          {attempt.itemCount} вопросов
                           {attempt.estimatedMinutes
-                            ? `около ${attempt.estimatedMinutes} мин.`
-                            : 'время прохождения пока не измерено'}
+                            ? ` · около ${attempt.estimatedMinutes} мин.`
+                            : ''}
                         </p>
                       </div>
                     </div>
-                    <Badge tone={done ? 'success' : started ? 'accent' : 'neutral'}>
-                      {attempt.stateLabel}
-                    </Badge>
+                    <div className="flex flex-wrap gap-2">
+                      {!attempt.required ? <Badge tone="neutral">Необязательный</Badge> : null}
+                      <Badge
+                        tone={
+                          processingDelayed
+                            ? 'neutral'
+                            : done
+                              ? 'success'
+                              : started
+                                ? 'accent'
+                                : 'neutral'
+                        }
+                      >
+                        {processingDelayed
+                          ? 'Обработка задерживается'
+                          : done
+                            ? 'Ответы отправлены'
+                            : attempt.stateLabel}
+                      </Badge>
+                    </div>
                   </div>
 
                   {started ? (
@@ -191,6 +217,12 @@ export default function ParticipantHomePage() {
                   <p className="max-w-[var(--reading-max)] text-sm leading-relaxed">
                     {attempt.participantIntro}
                   </p>
+
+                  {processingDelayed ? (
+                    <p className="text-sm text-[var(--text-secondary)]">
+                      Ответы получены. Повторно проходить тест не нужно.
+                    </p>
+                  ) : null}
 
                   {attempt.limitations.length > 0 ? (
                     <details className="text-sm">
@@ -208,7 +240,11 @@ export default function ParticipantHomePage() {
                   {!done ? (
                     <div>
                       <ButtonLink
-                        href={`/participant/tests/${attempt.attemptId}`}
+                        href={
+                          started
+                            ? `/participant/tests/${attempt.attemptId}`
+                            : `/participant/tests/${attempt.attemptId}/intro`
+                        }
                         variant={
                           attempt.attemptId === nextAttempt?.attemptId ? 'primary' : 'secondary'
                         }
