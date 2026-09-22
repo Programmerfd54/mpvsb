@@ -5,7 +5,7 @@
   "description": "Next.js App Router: три оболочки — руководитель, администратор, участник.",
   "type": "module",
   "scripts": {
-    "dev": "next dev --port ${WEB_PORT:-3000}",
+    "dev": "next dev --port 3000",
     "build": "next build",
     "start": "next start --port 3000",
     "typecheck": "tsc -p tsconfig.json --noEmit"

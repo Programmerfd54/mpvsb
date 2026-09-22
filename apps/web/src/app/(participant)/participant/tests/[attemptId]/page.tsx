@@ -72,7 +72,9 @@ export default function AttemptPage({ params }: { params: Promise<{ attemptId: s
             return result.data.attemptRevision;
           },
           (state, cause) => {
-            setSaveState(state);
+            setSaveState((previous) =>
+              state === 'idle' && previous === 'failed' ? 'failed' : state,
+            );
             if (state === 'saved') setError(null);
             if (state === 'failed') {
               const apiError = cause instanceof ApiError ? cause : null;
@@ -234,8 +236,8 @@ export default function AttemptPage({ params }: { params: Promise<{ attemptId: s
               </Button>
             }
           >
-            Чтобы не потерять ответы, обновите страницу — она покажет последнее сохранённое
-            состояние.
+            Сервер получил изменения из другого окна. Обновление покажет последнюю сохранённую
+            версию; неподтверждённый ввод в этой вкладке будет потерян.
           </Callout>
         </div>
       ) : null}
@@ -293,6 +295,11 @@ export default function AttemptPage({ params }: { params: Promise<{ attemptId: s
           {!item.required ? (
             <p className="text-xs text-[var(--text-secondary)]">
               На этот вопрос можно не отвечать.
+            </p>
+          ) : null}
+          {invalidDraft ? (
+            <p role="alert" className="text-sm text-[var(--danger-text)]">
+              Исправьте значение в поле, прежде чем переходить дальше.
             </p>
           ) : null}
         </CardBody>

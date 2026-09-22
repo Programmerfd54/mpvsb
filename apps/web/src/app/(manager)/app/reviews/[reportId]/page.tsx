@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useRef, useState } from 'react';
+import { use, useEffect, useRef, useState } from 'react';
 
 import type { Envelope, GenericAcknowledgement, ReportDetail } from '@context/contracts';
 import { REVIEW_CHECKLIST_ITEMS, REVIEW_CHECKLIST_LABELS } from '@context/contracts';
@@ -23,6 +23,7 @@ import { useApiMutation, useApiQuery } from '@/lib/query';
 import { useSession } from '@/lib/session';
 
 import { ChecksTab, computeChecks } from './_components/checks-tab';
+import { CorrectionsTab } from './_components/corrections-tab';
 
 /**
  * Проверка черновика заключения.
@@ -43,6 +44,12 @@ export default function ReviewPage({ params }: { params: Promise<{ reportId: str
   );
 
   const [tab, setTab] = useState('draft');
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('tab') === 'corrections') {
+      setTab('corrections');
+    }
+  }, []);
   const [checklist, setChecklist] = useState<Record<string, boolean>>({});
   const [comment, setComment] = useState('');
   const [highlightedCode, setHighlightedCode] = useState<string | null>(null);
@@ -177,6 +184,7 @@ export default function ReviewPage({ params }: { params: Promise<{ reportId: str
             items={[
               { value: 'draft', label: 'Заключение' },
               { value: 'checks', label: 'Проверки', count: attentionCount || undefined },
+              { value: 'corrections', label: 'Запросы на исправление' },
             ]}
           >
             <TabPanel value="draft" className="flex flex-col gap-5">
@@ -311,6 +319,11 @@ export default function ReviewPage({ params }: { params: Promise<{ reportId: str
 
             <TabPanel value="checks">
               <ChecksTab report={report} />
+            </TabPanel>
+            <TabPanel value="corrections">
+              {organizationId ? (
+                <CorrectionsTab organizationId={organizationId} reportId={reportId} />
+              ) : null}
             </TabPanel>
           </Tabs>
         </div>

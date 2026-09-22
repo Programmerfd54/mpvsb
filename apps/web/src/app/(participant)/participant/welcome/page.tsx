@@ -11,7 +11,6 @@ import { Button, ButtonLink } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/field';
 import { LoadingBlock, ErrorState, Callout } from '@/components/ui/states';
-import { notify } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import { useApiMutation, useApiQuery } from '@/lib/query';
 
@@ -29,6 +28,39 @@ function contactHref(contact: string | null): string | undefined {
   return undefined;
 }
 
+/** Группируем строки документа в абзацы и списки, не интерпретируя HTML. */
+function TermsContent({ markdown }: { markdown: string }) {
+  const blocks = markdown.trim().split(/\n\s*\n/);
+
+  return (
+    <div className="flex max-w-[var(--reading-max)] min-w-0 flex-col gap-4 break-words text-base leading-relaxed">
+      {blocks.map((block, index) => {
+        const lines = block.trim().split('\n');
+        const first = lines[0] ?? '';
+        if (/^#{1,3} /.test(first)) {
+          const heading = first.replace(/^#{1,3} /, '');
+          return (
+            <section key={index} className="flex flex-col gap-2">
+              <h2 className="text-lg font-semibold">{heading}</h2>
+              {lines.length > 1 ? <p>{lines.slice(1).join(' ')}</p> : null}
+            </section>
+          );
+        }
+        if (lines.every((line) => /^[-*] /.test(line))) {
+          return (
+            <ul key={index} className="list-disc space-y-1 pl-6">
+              {lines.map((line, lineIndex) => (
+                <li key={lineIndex}>{line.slice(2)}</li>
+              ))}
+            </ul>
+          );
+        }
+        return <p key={index}>{lines.join(' ')}</p>;
+      })}
+    </div>
+  );
+}
+
 /**
  * Информирование и согласие.
  *
@@ -39,6 +71,7 @@ export default function WelcomePage() {
   const router = useRouter();
   const [accepted, setAccepted] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [declined, setDeclined] = useState(false);
 
   const sessionQuery = useApiQuery<Envelope<ParticipantSession>>(
     ['participant-session'],
@@ -76,9 +109,6 @@ export default function WelcomePage() {
           setSessionExpired(true);
           return;
         }
-        notify.error(apiError?.problem.title ?? 'Не удалось сохранить согласие', {
-          requestId: apiError?.problem.requestId,
-        });
       },
     },
   );
@@ -86,26 +116,37 @@ export default function WelcomePage() {
   const declineMutation = useApiMutation<void, Envelope<unknown>>(
     () => api.post('/participant/decline'),
     {
-      onSuccess: () => router.push('/participant/done?declined=1'),
+      onSuccess: () => setDeclined(true),
       onError: (apiError) => {
         if (apiError?.status === 401) {
           setSessionExpired(true);
           return;
         }
-        notify.error(apiError?.problem.title ?? 'Не удалось сохранить отказ', {
-          requestId: apiError?.problem.requestId,
-        });
       },
     },
   );
 
   const loadError = sessionQuery.error ?? termsQuery.error;
 
+  if (declined) {
+    return (
+      <Card>
+        <CardHeader title="Отказ от участия сохранён" />
+        <CardBody className="flex flex-col gap-3">
+          <p>Сервер подтвердил ваш отказ. Проходить тесты не нужно.</p>
+          <p className="text-[var(--text-secondary)]">
+            Если вы передумаете, обратитесь к тому, кто передал вам приглашение.
+          </p>
+        </CardBody>
+      </Card>
+    );
+  }
+
   if (sessionExpired || loadError?.status === 401) {
     return (
       <ErrorState
-        title="Сессия участия истекла"
-        description="Откройте персональную ссылку заново. Сохранённые ответы останутся на месте."
+        title="Сеанс участия завершён"
+        description="Если вы хотите продолжить участие или уточнить его состояние, обратитесь к отправителю приглашения."
       />
     );
   }
@@ -160,28 +201,7 @@ export default function WelcomePage() {
       <Card>
         <CardHeader title={terms.title} />
         <CardBody>
-          <div className="flex max-w-[var(--reading-max)] flex-col gap-3 text-sm leading-relaxed">
-            {terms.bodyMarkdown.split('\n').map((line, index) => {
-              if (line.startsWith('## ')) {
-                return (
-                  <h2 key={index} className="mt-3 text-base font-semibold">
-                    {line.slice(3)}
-                  </h2>
-                );
-              }
-              if (line.startsWith('# ')) {
-                return (
-                  <h2 key={index} className="text-base font-semibold">
-                    {line.slice(2)}
-                  </h2>
-                );
-              }
-              if (line.trim() === '') {
-                return null;
-              }
-              return <p key={index}>{line}</p>;
-            })}
-          </div>
+          <TermsContent markdown={terms.bodyMarkdown} />
         </CardBody>
       </Card>
 
@@ -190,15 +210,23 @@ export default function WelcomePage() {
           <Checkbox
             checked={accepted}
             onChange={setAccepted}
+            disabled={pending}
             label="Я прочитал(а) условия участия и согласен(на) пройти оценку."
           />
+
+          {acceptMutation.error || declineMutation.error ? (
+            <Callout tone="danger" role="alert" title="Не удалось сохранить решение">
+              {acceptMutation.error?.problem.title ?? declineMutation.error?.problem.title}{' '}
+              Проверьте подключение и повторите попытку.
+            </Callout>
+          ) : null}
 
           <div className="flex flex-wrap gap-3">
             <Button
               variant="primary"
               size="lg"
-              disabled={!accepted}
-              disabledReason={!accepted ? 'Сначала подтвердите согласие' : undefined}
+              disabled={!accepted || declineMutation.isPending}
+              disabledReason={!accepted && !pending ? 'Сначала подтвердите согласие' : undefined}
               loading={acceptMutation.isPending}
               onClick={() => acceptMutation.mutate()}
             >
@@ -213,7 +241,7 @@ export default function WelcomePage() {
               variant="ghost"
               size="lg"
               loading={declineMutation.isPending}
-              disabled={pending && !declineMutation.isPending}
+              disabled={acceptMutation.isPending}
               onClick={() => declineMutation.mutate()}
             >
               Не участвовать
@@ -224,7 +252,11 @@ export default function WelcomePage() {
             <p className="text-sm text-[var(--text-secondary)]">
               Вопросы об участии: {session.organizationContact}
             </p>
-          ) : null}
+          ) : (
+            <p className="text-sm text-[var(--text-secondary)]">
+              Если у вас есть вопросы, обратитесь к тому, кто передал приглашение.
+            </p>
+          )}
         </CardBody>
       </Card>
     </>
