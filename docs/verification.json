@@ -1,19 +1,19 @@
 {
-  "checkedAtUtc": "2026-09-17T09:16:12.659577+00:00",
+  "checkedAtUtc": "2026-09-22T13:37:50.224243+00:00",
   "scope": "Documentation structure, internal links, task graph, page coverage and generated file consistency only. Says nothing about whether the application works: for that see npm run build / typecheck / lint / test / test:integration.",
   "result": "pass",
-  "sourceModules": 26,
-  "taskCount": 73,
+  "sourceModules": 28,
+  "taskCount": 78,
   "pageStateGroups": 38,
-  "internalLinksChecked": 353,
+  "internalLinksChecked": 391,
   "statuses": {
-    "todo": 16,
+    "todo": 20,
     "in_progress": 3,
     "blocked": 4,
     "review": 1,
-    "done": 43,
+    "done": 44,
     "deferred": 6
   },
-  "bundleSha256": "bb56d440f2e926ba4391581fad5396f94712e4ab46aa8ac7a79be079417ce466",
+  "bundleSha256": "603d2dc9414528d66693e81f03779910872e06547a298dc01b592024af36e180",
   "errors": []
 }

@@ -8,6 +8,8 @@ import re
 ROOT = Path(__file__).resolve().parents[1]
 SOURCES = [
     'docs/START_PROMPT.md',
+    'TASKS_ROLE2_FRONTEND.md',
+    'TASKS_ROLE1_ARCH_SECURITY_DEVOPS.md',
     *[f'docs/spec/{name}' for name in [
         '00-scope.md', '01-product-roles.md', '02-design-system.md',
         '03-manager-pages.md', '04-employee-pages.md', '05-admin-pages.md',

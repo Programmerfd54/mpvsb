@@ -44,6 +44,7 @@
     "db:migrate": "npm run migrate --workspace @context/database",
     "db:reset": "npm run reset --workspace @context/database",
     "db:seed:demo": "npm run seed:demo --workspace @context/database",
+    "db:seed:test-data": "npm run seed:test-data --workspace @context/database",
     "api:openapi": "npm run openapi --workspace @context/api",
     "docs:build": "python3 scripts/build_spec.py",
     "docs:check": "python3 scripts/check_spec.py",

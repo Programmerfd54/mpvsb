@@ -19,7 +19,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
     "migrate": "tsx --env-file-if-exists=../../.env src/cli/migrate.ts",
     "reset": "tsx --env-file-if-exists=../../.env src/cli/migrate.ts --reset",
-    "seed:demo": "tsx --env-file-if-exists=../../.env src/cli/seed-demo.ts"
+    "seed:demo": "tsx --env-file-if-exists=../../.env src/cli/seed-demo.ts",
+    "seed:test-data": "tsx --env-file-if-exists=../../.env src/cli/seed-test-data.ts"
   },
   "dependencies": {
     "@context/contracts": "*",
