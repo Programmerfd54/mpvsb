@@ -9,6 +9,11 @@
 - `/admin/setup` больше не показывает заглушки после первого шага. Подключены формы SMTP-настроек
   и шаблона письма, проверка SMTP-соединения, переходы к `/admin/departments` и `/admin/users`,
   финальная проверка шагов по данным `AdminWorkspace`.
+- Добавлен первый участникский privacy-flow: `/participant/privacy` и
+  `POST /participant/privacy-requests` создают заявку `correction/access/withdrawal` с receipt-кодом
+  по текущей participant-сессии. Это закрывает отсутствие страницы E08 как рабочий вход, но не
+  закрывает полный Q-01: admin A12, deletion request/job, выполнение удаления и backup cleanup ещё
+  не реализованы.
 - Проверки после правки: `npm run typecheck`, `npm run lint`, `npm run test`, `npm run build`.
 - Блокер integration подтверждён как проблема локального Docker/PostgreSQL окружения: `docker version`
   и `docker compose ps` зависают; `Test-NetConnection` видит порты 55442/55443, но прямой `pg`

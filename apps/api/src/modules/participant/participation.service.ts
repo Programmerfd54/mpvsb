@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { randomBytes } from 'node:crypto';
 
 import {
   answerResponseSchema,
@@ -9,6 +10,8 @@ import {
   type ParticipantAttemptDetail,
   type ParticipantAttemptSummary,
   type ParticipantCompletion,
+  type PrivacyReceipt,
+  type PrivacyRequestInput,
   type ParticipantSession,
   type ParticipantTerms,
   type SaveAnswerResult,
@@ -736,6 +739,59 @@ export class ParticipationService {
         explanation: feedbackAvailable
           ? 'После проверки вам будет доступна согласованная краткая обратная связь.'
           : 'Развёрнутое заключение предназначено руководителю. Вам доступно подтверждение участия; срок подготовки заранее не назван, потому что он зависит от проверки человеком.',
+      };
+    });
+  }
+
+  async createPrivacyRequest(
+    actor: RequestActor,
+    input: PrivacyRequestInput,
+  ): Promise<PrivacyReceipt> {
+    const { organizationId, assignmentId } = requireScope(actor);
+
+    return this.prisma.tenant({ organizationId }, async (tx) => {
+      const assignment = await tx.assignments.findFirst({
+        where: { id: assignmentId, organization_id: organizationId },
+        select: { id: true, employee_id: true },
+      });
+      if (!assignment) {
+        throw AppError.notFound('Участие не найдено');
+      }
+
+      const receiptCode = `PR-${randomBytes(5).toString('hex').toUpperCase()}`;
+      const created = await tx.privacy_requests.create({
+        data: {
+          organization_id: organizationId,
+          subject_type: 'participant',
+          assignment_id: assignment.id,
+          employee_id: assignment.employee_id,
+          request_type: input.requestType,
+          description: input.description,
+          receipt_code: receiptCode,
+        },
+        select: {
+          receipt_code: true,
+          request_type: true,
+          state: true,
+          requested_at: true,
+        },
+      });
+
+      await this.audit.recordIn(tx, {
+        action: 'privacy.request_created',
+        outcome: 'success',
+        organizationId,
+        resourceType: 'privacy_request',
+        metadata: { requestType: input.requestType, subjectType: 'participant' },
+      });
+
+      return {
+        receiptCode: created.receipt_code,
+        requestType: created.request_type as PrivacyReceipt['requestType'],
+        state: created.state,
+        submittedAt: created.requested_at.toISOString(),
+        explanation:
+          'Заявка получена. Ответственный администратор проверит её по внутренней процедуре; удаление данных выполняется отдельным подтверждённым процессом.',
       };
     });
   }

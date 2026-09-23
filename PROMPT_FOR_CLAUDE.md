@@ -2540,6 +2540,11 @@ PR/изменение описывает проблему, поведение, �
 - `/admin/setup` больше не показывает заглушки после первого шага. Подключены формы SMTP-настроек
   и шаблона письма, проверка SMTP-соединения, переходы к `/admin/departments` и `/admin/users`,
   финальная проверка шагов по данным `AdminWorkspace`.
+- Добавлен первый участникский privacy-flow: `/participant/privacy` и
+  `POST /participant/privacy-requests` создают заявку `correction/access/withdrawal` с receipt-кодом
+  по текущей participant-сессии. Это закрывает отсутствие страницы E08 как рабочий вход, но не
+  закрывает полный Q-01: admin A12, deletion request/job, выполнение удаления и backup cleanup ещё
+  не реализованы.
 - Проверки после правки: `npm run typecheck`, `npm run lint`, `npm run test`, `npm run build`.
 - Блокер integration подтверждён как проблема локального Docker/PostgreSQL окружения: `docker version`
   и `docker compose ps` зависают; `Test-NetConnection` видит порты 55442/55443, но прямой `pg`
@@ -2804,6 +2809,17 @@ M14-notifications этой сессии (см. `docs/knowledge/CHANGELOG.md` 1.2
 *Исходный модуль: `docs/knowledge/CHANGELOG.md`*
 
 # История изменений
+
+## 1.8 — 23.09.2026
+
+Добавлен первый рабочий срез privacy-flow для участника: `POST /participant/privacy-requests`
+создаёт серверную заявку в `platform.privacy_requests` по текущей participant-сессии и возвращает
+receipt; появилась страница `/participant/privacy` с формой correction/access/withdrawal, условиями
+участия и ссылкой из `/participant/done`.
+
+Это не закрывает весь Q-01 deletion lifecycle: выполнение удаления, admin A12, deletion job и backup
+cleanup остаются отдельной P0-работой. Проверки: `npm run typecheck`, `npm run lint`,
+`npm run test`, `npm run build` — без ошибок.
 
 ## 1.7 — 23.09.2026
 

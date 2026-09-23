@@ -1,5 +1,16 @@
 # История изменений
 
+## 1.8 — 23.09.2026
+
+Добавлен первый рабочий срез privacy-flow для участника: `POST /participant/privacy-requests`
+создаёт серверную заявку в `platform.privacy_requests` по текущей participant-сессии и возвращает
+receipt; появилась страница `/participant/privacy` с формой correction/access/withdrawal, условиями
+участия и ссылкой из `/participant/done`.
+
+Это не закрывает весь Q-01 deletion lifecycle: выполнение удаления, admin A12, deletion job и backup
+cleanup остаются отдельной P0-работой. Проверки: `npm run typecheck`, `npm run lint`,
+`npm run test`, `npm run build` — без ошибок.
+
 ## 1.7 — 23.09.2026
 
 Доведён мастер `/admin/setup`: вместо заглушек после первого шага теперь есть рабочие шаги SMTP,
