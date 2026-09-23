@@ -18,7 +18,7 @@ import type { ReactNode } from 'react';
 import type { AdminOverview, Envelope } from '@context/contracts';
 
 import { Badge } from '@/components/ui/badge';
-import { Button, ButtonLink } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader, StatCard } from '@/components/ui/card';
 import { Callout, EmptyState, ErrorState, PageSkeleton } from '@/components/ui/states';
 import { PageHeader } from '@/components/layout/page-header';
@@ -74,15 +74,6 @@ export default function AdminOverviewPage() {
       <PageHeader
         title="Состояние платформы"
         description="Эксплуатационные количества. Содержание оценок в этом разделе не показывается."
-        action={
-          <ButtonLink
-            href="/admin/organizations?create=1"
-            variant="primary"
-            icon={<Building2 aria-hidden="true" />}
-          >
-            Создать организацию
-          </ButtonLink>
-        }
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">

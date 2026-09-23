@@ -2,22 +2,24 @@ import { Module } from '@nestjs/common';
 
 import { AuthModule } from '../auth/auth.module';
 import { ReportsModule } from '../reports/reports.module';
-import { AdminContentService } from './admin-content.service';
 import { AdminController } from './admin.controller';
+import { AdminDepartmentsService } from './admin-departments.service';
 import { AdminOperationsService } from './admin-operations.service';
 import { AdminOrganizationsService } from './admin-organizations.service';
-import { MethodEditorService } from './method-editor.service';
-import { ScenarioEditorService } from './scenario-editor.service';
+import { AdminWorkspaceService } from './admin-workspace.service';
+import { AdminUsersService } from './admin-users.service';
+import { AdminMailService } from './admin-mail.service';
 
 @Module({
   imports: [AuthModule, ReportsModule],
   controllers: [AdminController],
   providers: [
     AdminOrganizationsService,
-    AdminContentService,
     AdminOperationsService,
-    MethodEditorService,
-    ScenarioEditorService,
+    AdminWorkspaceService,
+    AdminDepartmentsService,
+    AdminUsersService,
+    AdminMailService,
   ],
 })
 export class AdminModule {}

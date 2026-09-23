@@ -42,10 +42,12 @@ export const authProfileSchema = z.object({
   userId: uuidSchema,
   displayName: z.string(),
   email: z.string(),
+  actorType: z.enum(['platform_admin', 'manager', 'employee']),
   isPlatformAdmin: z.boolean(),
   memberships: z.array(membershipSummarySchema),
   /** Организация по умолчанию: одна — открываем сразу, несколько — просим выбрать. */
   defaultOrganizationId: uuidSchema.nullable(),
+  employeeId: uuidSchema.nullable(),
 });
 export type AuthProfile = z.infer<typeof authProfileSchema>;
 

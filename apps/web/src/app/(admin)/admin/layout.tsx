@@ -2,12 +2,13 @@
 
 import {
   Activity,
-  BookOpenCheck,
+  Building,
   Building2,
   Gauge,
   LogOut,
-  Route,
+  Settings2,
   ShieldCheck,
+  Users,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, type ReactNode } from 'react';
@@ -28,9 +29,10 @@ const NAVIGATION: readonly ShellNavGroup[] = [
     label: 'Платформа',
     items: [
       { href: '/admin', label: 'Обзор', icon: Gauge, exact: true },
+      { href: '/admin/setup', label: 'Настройка', icon: Settings2 },
+      { href: '/admin/departments', label: 'Подразделения', icon: Building },
+      { href: '/admin/users', label: 'Пользователи', icon: Users },
       { href: '/admin/organizations', label: 'Организации', icon: Building2 },
-      { href: '/admin/methods', label: 'Методики', icon: BookOpenCheck },
-      { href: '/admin/scenarios', label: 'Сценарии', icon: Route },
       { href: '/admin/operations', label: 'Обработка и аудит', icon: Activity },
     ],
   },

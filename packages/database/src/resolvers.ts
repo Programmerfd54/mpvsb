@@ -26,6 +26,22 @@ export async function resolveUserMemberships(
   `;
 }
 
+export interface ResolvedEmployeeAccount {
+  readonly employee_id: string;
+  readonly organization_id: string;
+  readonly department_id: string | null;
+}
+
+export async function resolveEmployeeAccount(
+  prisma: PrismaClient,
+  userId: string,
+): Promise<ResolvedEmployeeAccount | null> {
+  const rows = await prisma.$queryRaw<ResolvedEmployeeAccount[]>`
+    select * from app.resolve_employee_account(${userId}::uuid)
+  `;
+  return rows[0] ?? null;
+}
+
 export interface ResolvedParticipantSession {
   readonly session_id: string;
   readonly organization_id: string;

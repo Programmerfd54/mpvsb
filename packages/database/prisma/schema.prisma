@@ -87,38 +87,40 @@ model assignment_drafts {
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model assignments {
-  id                     String                  @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  organization_id        String                  @db.Uuid
-  employee_id            String                  @db.Uuid
-  scenario_version_id    String                  @db.Uuid
-  context_snapshot       Json                    @default("{}")
-  mode                   String                  @default("demo")
-  state                  String                  @default("draft")
-  due_at                 DateTime?               @db.Timestamptz(6)
-  created_by             String                  @db.Uuid
-  completed_at           DateTime?               @db.Timestamptz(6)
-  cancelled_at           DateTime?               @db.Timestamptz(6)
-  cancel_reason          String?
-  replaces_assignment_id String?                 @db.Uuid
-  data_generation        BigInt                  @default(1)
-  processing_hold        Boolean                 @default(false)
-  created_at             DateTime                @default(now()) @db.Timestamptz(6)
-  updated_at             DateTime                @default(now()) @db.Timestamptz(6)
-  revision               Int                     @default(1)
-  users                  users                   @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  employees              employees               @relation(fields: [organization_id, employee_id], references: [organization_id, id], onUpdate: NoAction)
-  organizations          organizations           @relation(fields: [organization_id], references: [id], onUpdate: NoAction)
-  assignments            assignments?            @relation("assignmentsToassignments", fields: [replaces_assignment_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  other_assignments      assignments[]           @relation("assignmentsToassignments")
-  scenario_versions      scenario_versions       @relation(fields: [scenario_version_id], references: [id], onUpdate: NoAction)
-  attempts               attempts[]
-  consent_records        consent_records[]
-  evidence_items         evidence_items[]
-  invitations            invitations?
-  participant_sessions   participant_sessions?
-  participation_declines participation_declines?
-  reports                reports?
-  study_cases            study_cases[]
+  id                              String                  @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id                 String                  @db.Uuid
+  employee_id                     String                  @db.Uuid
+  scenario_version_id             String                  @db.Uuid
+  context_snapshot                Json                    @default("{}")
+  mode                            String                  @default("demo")
+  state                           String                  @default("draft")
+  due_at                          DateTime?               @db.Timestamptz(6)
+  created_by                      String                  @db.Uuid
+  completed_at                    DateTime?               @db.Timestamptz(6)
+  cancelled_at                    DateTime?               @db.Timestamptz(6)
+  cancel_reason                   String?
+  replaces_assignment_id          String?                 @db.Uuid
+  data_generation                 BigInt                  @default(1)
+  processing_hold                 Boolean                 @default(false)
+  department_id_snapshot          String?                 @db.Uuid
+  responsible_manager_id_snapshot String?                 @db.Uuid
+  created_at                      DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at                      DateTime                @default(now()) @db.Timestamptz(6)
+  revision                        Int                     @default(1)
+  users                           users                   @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees                       employees               @relation(fields: [organization_id, employee_id], references: [organization_id, id], onUpdate: NoAction)
+  organizations                   organizations           @relation(fields: [organization_id], references: [id], onUpdate: NoAction)
+  assignments                     assignments?            @relation("assignmentsToassignments", fields: [replaces_assignment_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_assignments               assignments[]           @relation("assignmentsToassignments")
+  scenario_versions               scenario_versions       @relation(fields: [scenario_version_id], references: [id], onUpdate: NoAction)
+  attempts                        attempts[]
+  consent_records                 consent_records[]
+  evidence_items                  evidence_items[]
+  invitations                     invitations?
+  participant_sessions            participant_sessions?
+  participation_declines          participation_declines?
+  reports                         reports?
+  study_cases                     study_cases[]
 
   @@unique([organization_id, id])
   @@index([organization_id, employee_id, created_at(sort: Desc)], map: "assignments_employee_idx")
@@ -468,6 +470,8 @@ model organizations {
   created_at                  DateTime                   @default(now()) @db.Timestamptz(6)
   updated_at                  DateTime                   @default(now()) @db.Timestamptz(6)
   revision                    Int                        @default(1)
+  logo_url                    String?
+  setup_completed_at          DateTime?                  @db.Timestamptz(6)
   access_grants               access_grants[]
   answers                     answers[]
   assignment_drafts           assignment_drafts[]
@@ -881,6 +885,8 @@ model employees {
   external_code   String?
   job_title       String?
   department      String?
+  department_id   String?       @db.Uuid
+  user_id         String?       @db.Uuid
   email           String?
   archived_at     DateTime?     @db.Timestamptz(6)
   created_at      DateTime      @default(now()) @db.Timestamptz(6)
@@ -890,8 +896,55 @@ model employees {
   organizations   organizations @relation(fields: [organization_id], references: [id], onUpdate: NoAction)
 
   @@unique([organization_id, external_code], map: "employees_external_code_key", where: raw("(external_code IS NOT NULL)"))
+  @@unique([organization_id, user_id], map: "employees_user_key", where: raw("(user_id IS NOT NULL)"))
   @@unique([organization_id, id])
   @@index([organization_id, archived_at, id], map: "employees_active_idx")
+  @@index([organization_id, department_id, archived_at], map: "employees_department_idx")
+  @@schema("identity")
+}
+
+model departments {
+  id              String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id String    @db.Uuid
+  name            String
+  status          String    @default("active")
+  archived_at     DateTime? @db.Timestamptz(6)
+  revision        Int       @default(1)
+  created_at      DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@unique([organization_id, id])
+  @@index([organization_id, status, name], map: "departments_status_idx")
+  @@schema("core")
+}
+
+model department_managers {
+  id              String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id String    @db.Uuid
+  department_id   String    @db.Uuid
+  user_id         String    @db.Uuid
+  assigned_by     String?   @db.Uuid
+  assigned_at     DateTime  @default(now()) @db.Timestamptz(6)
+  revoked_at      DateTime? @db.Timestamptz(6)
+
+  @@unique([organization_id, id])
+  @@index([organization_id, user_id, revoked_at], map: "department_managers_user_idx")
+  @@schema("core")
+}
+
+model employee_department_history {
+  id                 String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organization_id    String   @db.Uuid
+  employee_id        String   @db.Uuid
+  from_department_id String?  @db.Uuid
+  to_department_id   String?  @db.Uuid
+  effective_at       DateTime @default(now()) @db.Timestamptz(6)
+  transferred_by     String?  @db.Uuid
+  reason             String?
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([organization_id, id])
+  @@index([organization_id, employee_id, effective_at(sort: Desc)], map: "employee_department_history_employee_idx")
   @@schema("identity")
 }
 
@@ -1133,5 +1186,49 @@ model readiness_checks {
   users           users?        @relation(fields: [verified_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@unique([organization_id, check_key])
+  @@schema("platform")
+}
+
+model workspace_state {
+  singleton       Boolean  @id @default(true)
+  organization_id String   @unique @db.Uuid
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  @@schema("platform")
+}
+
+model workspace_mail_settings {
+  organization_id      String    @id @db.Uuid
+  host                 String
+  port                 Int
+  secure               Boolean   @default(true)
+  username             String?
+  password_encrypted   String?
+  from_email           String
+  from_name            String
+  revision             Int       @default(1)
+  verified_at          DateTime? @db.Timestamptz(6)
+  last_test_error_code String?
+  created_at           DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@schema("platform")
+}
+
+model workspace_mail_templates {
+  organization_id String    @id @db.Uuid
+  subject         String
+  greeting        String
+  body            String
+  button_label    String
+  signature       String
+  support_contact String?
+  status          String    @default("draft")
+  revision        Int       @default(1)
+  published_at    DateTime? @db.Timestamptz(6)
+  created_at      DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime  @default(now()) @db.Timestamptz(6)
+
   @@schema("platform")
 }

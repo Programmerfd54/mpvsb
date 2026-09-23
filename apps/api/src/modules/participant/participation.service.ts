@@ -132,6 +132,74 @@ export class ParticipationService {
     });
   }
 
+  /** Открывает обычный participant-поток из авторизованного кабинета сотрудника. */
+  async openForEmployee(
+    actor: RequestActor,
+    assignmentId: string,
+  ): Promise<IssuedParticipantSession> {
+    if (!actor.organizationId || !actor.employeeId) {
+      throw AppError.forbidden('Сессия сотрудника не содержит область доступа');
+    }
+    const organizationId = actor.organizationId;
+    const now = new Date();
+
+    return this.prisma.tenant({ organizationId }, async (tx) => {
+      const assignment = await tx.assignments.findFirst({
+        where: { id: assignmentId, organization_id: organizationId, employee_id: actor.employeeId },
+        select: {
+          id: true,
+          state: true,
+          due_at: true,
+          invitations: { select: { id: true, expires_at: true, revoked_at: true } },
+        },
+      });
+      if (!assignment || !acceptsParticipation(assignment.state as AssignmentState)) {
+        throw AppError.notFound('Оценка не найдена или больше не принимает ответы');
+      }
+      if (
+        !assignment.invitations ||
+        assignment.invitations.revoked_at ||
+        assignment.invitations.expires_at <= now
+      ) {
+        throw AppError.conflict('Срок участия истёк. Обратитесь к ответственному руководителю.');
+      }
+
+      await tx.participant_sessions.updateMany({
+        where: { organization_id: organizationId, assignment_id: assignment.id, revoked_at: null },
+        data: { revoked_at: now },
+      });
+      const secret = generateSecret();
+      const policy = SESSION_POLICY.participant;
+      const policyExpiry = new Date(now.getTime() + policy.absoluteMinutes * 60_000);
+      const cappedExpiry = [policyExpiry, assignment.invitations.expires_at, assignment.due_at]
+        .filter((value): value is Date => value instanceof Date)
+        .reduce((earliest, value) => (value < earliest ? value : earliest), policyExpiry);
+
+      await tx.participant_sessions.create({
+        data: {
+          organization_id: organizationId,
+          assignment_id: assignment.id,
+          invitation_id: assignment.invitations.id,
+          session_hash: hashSecret(secret),
+          idle_expires_at: new Date(now.getTime() + policy.idleMinutes * 60_000),
+          absolute_expires_at: cappedExpiry,
+        },
+      });
+      await this.audit.recordIn(tx, {
+        action: 'participation.session_opened',
+        outcome: 'success',
+        organizationId,
+        resourceType: 'assignment',
+        resourceId: assignment.id,
+        metadata: { source: 'employee_cabinet' },
+      });
+      return {
+        secret,
+        maxAgeSeconds: Math.max(60, Math.floor((cappedExpiry.getTime() - now.getTime()) / 1000)),
+      };
+    });
+  }
+
   async session(actor: RequestActor): Promise<ParticipantSession> {
     const { organizationId, assignmentId } = requireScope(actor);
 

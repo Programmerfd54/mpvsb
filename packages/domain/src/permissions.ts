@@ -70,7 +70,13 @@ export function findStudyRoleConflict(
 }
 
 /** Тип действующего лица запроса. Типы не объединяются между собой (ТЗ 10.2). */
-export const ACTOR_TYPES = ['manager', 'platform_admin', 'participant', 'service'] as const;
+export const ACTOR_TYPES = [
+  'manager',
+  'platform_admin',
+  'employee',
+  'participant',
+  'service',
+] as const;
 export type ActorType = (typeof ACTOR_TYPES)[number];
 
 /**

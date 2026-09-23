@@ -302,6 +302,14 @@ async function main(): Promise<void> {
         });
         map.set(org.code, created.id);
       }
+      const primaryOrganizationId = map.get('demo_alpha');
+      if (primaryOrganizationId) {
+        await tx.workspace_state.upsert({
+          where: { singleton: true },
+          create: { organization_id: primaryOrganizationId },
+          update: { organization_id: primaryOrganizationId },
+        });
+      }
       return map;
     });
 
