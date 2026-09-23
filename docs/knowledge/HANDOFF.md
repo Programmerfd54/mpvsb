@@ -14,12 +14,13 @@
   по текущей participant-сессии. Это закрывает отсутствие страницы E08 как рабочий вход, но не
   закрывает полный Q-01: admin A12, deletion request/job, выполнение удаления и backup cleanup ещё
   не реализованы.
+- Исправлен запуск worker на Windows: `apps/worker/src/main.ts` больше не сравнивает URL модуля с
+  путём через unix-only split, поэтому `npm run dev` реально поднимает worker, outbox доставляется в
+  pg-boss, а черновики заключений появляются без ручного запуска.
 - Проверки после правки: `npm run typecheck`, `npm run lint`, `npm run test`, `npm run build`.
-- Блокер integration подтверждён как проблема локального Docker/PostgreSQL окружения: `docker version`
-  и `docker compose ps` зависают; `Test-NetConnection` видит порты 55442/55443, но прямой `pg`
-  handshake к `context` и `context_test` завершается `timeout expired`. Пока Docker backend не
-  перезапущен/не восстановлен, `npm run test:integration`, миграции и живой browser-QA с API будут
-  зависать на подключении к БД.
+  После восстановления Docker/PostgreSQL дополнительно пройдены `npm run test:integration` (149
+  integration-тестов) и `npm run test:e2e:api` (10/10 API E2E). Demo seed был обновлён, поэтому
+  локальные demo-пароли снова свежие.
 
 ### Что сделано
 
@@ -43,14 +44,15 @@ npm run build
 
 ### Что не подтверждено
 
-- `npm run test:integration` был запущен, но завис без вывода и остановлен вручную. Не считать integration зелёным до повторного прогона на свежей БД.
 - Не выполнен ручной браузерный QA новых экранов на 360/390/768/1280/1440 px, 200% zoom, keyboard и reduced motion.
 - Не проверялся реальный SMTP `verify()` с рабочими доступами.
 - Новые экраны ещё требуют продуктовой приёмки текстов, прав и empty/error/conflict-состояний.
 
 ### Следующая конкретная задача
 
-Повторить `npm run test:integration` после проверки состояния локальной PostgreSQL/dev seed, затем пройти `/admin/setup`, `/admin/departments`, `/admin/users`, `/employee/*` в браузере под synthetic-аккаунтами и зафиксировать найденные дефекты отдельным коммитом.
+Пройти `/admin/setup`, `/admin/departments`, `/admin/users`, `/employee/*` и participant privacy в
+браузере под synthetic-аккаунтами, затем добрать Q-01 deletion lifecycle: admin A12, deletion job,
+фактическое удаление и backup cleanup.
 
 ## Продолжение UI/UX — 17.09.2026
 

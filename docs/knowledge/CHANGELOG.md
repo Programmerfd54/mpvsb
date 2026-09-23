@@ -1,5 +1,14 @@
 # История изменений
 
+## 1.9 — 23.09.2026
+
+Исправлен запуск `apps/worker` на Windows: проверка прямого запуска теперь сравнивает нормализованные
+пути через `fileURLToPath`, поэтому `npm run dev` действительно поднимает worker, доставляет outbox
+в pg-boss и готовит черновики заключений.
+
+После восстановления Docker/PostgreSQL подтверждены проверки: `npm run test:integration` — 9 файлов /
+149 тестов passed; `npm run test:e2e:api` с fresh demo-credentials — 10/10 passed.
+
 ## 1.8 — 23.09.2026
 
 Добавлен первый рабочий срез privacy-flow для участника: `POST /participant/privacy-requests`

@@ -2165,6 +2165,9 @@ flowchart LR
   - Подтверждение: Каркас Playwright (проекты api/chromium) и 6 сценариев на уровне HTTP API: сквозной путь трёх ролей, изоляция организаций по известным id, отсутствие сырых ответов участника и ключей подсчёта в публичных DTO, границы сессии участника (чужая попытка, перевыпуск ссылки, запрет правки после submit), CSRF на изменяющих маршрутах, доступ к заключению только по reports.review. (`tests/e2e/api/*.spec.ts, tests/e2e/support/*.ts, playwright.config.ts`)
   - Подтверждение: 8 passed, 2 failed по таймауту ожидания (не по утверждениям теста — worker готовил заключение на 146-й секунде при лимите 120с, лимиты подняты до 180/360с). После смены паролей повторный прогон недоступен без свежего db:seed:demo — записано как текущее ограничение проверки, не как дефект тестов.
   - Проверка: `npx playwright test --project=api (до пересева demo-базы параллельной сессией)`.
+  - Подтверждение: Исправлен direct-run guard worker для Windows: путь entrypoint сравнивается через fileURLToPath/path.resolve, поэтому npm run dev действительно запускает worker и dispatcher outbox. (`apps/worker/src/main.ts`)
+  - Подтверждение: После восстановления Docker/PostgreSQL и fresh db:seed:demo integration прошёл: 9 файлов / 149 тестов passed. API E2E прошёл: 10/10 passed; worker доставил outbox в pg-boss и подготовил черновики заключений.
+  - Проверка: `npm run test:integration && npm run test:e2e:api`.
   - Подтверждение: Лимит неудачных попыток входа реализован и проверен живьём (11-я попытка → 429), но обнаружено: на dev-стенде web проксирует API без реального client IP (trustProxy выключен), ключ лимита вырождается в «учётная запись» — один клиент со старым паролем блокирует вход всем. Код полностью откачен (API перезапущен, подтверждено health-check), задокументирован как ADR-предложение с условием (проброс X-Forwarded-For из web) до включения.
   - Проверка: `Попытка включить лимит частоты входа, честно откачена`.
 
@@ -2545,12 +2548,13 @@ PR/изменение описывает проблему, поведение, �
   по текущей participant-сессии. Это закрывает отсутствие страницы E08 как рабочий вход, но не
   закрывает полный Q-01: admin A12, deletion request/job, выполнение удаления и backup cleanup ещё
   не реализованы.
+- Исправлен запуск worker на Windows: `apps/worker/src/main.ts` больше не сравнивает URL модуля с
+  путём через unix-only split, поэтому `npm run dev` реально поднимает worker, outbox доставляется в
+  pg-boss, а черновики заключений появляются без ручного запуска.
 - Проверки после правки: `npm run typecheck`, `npm run lint`, `npm run test`, `npm run build`.
-- Блокер integration подтверждён как проблема локального Docker/PostgreSQL окружения: `docker version`
-  и `docker compose ps` зависают; `Test-NetConnection` видит порты 55442/55443, но прямой `pg`
-  handshake к `context` и `context_test` завершается `timeout expired`. Пока Docker backend не
-  перезапущен/не восстановлен, `npm run test:integration`, миграции и живой browser-QA с API будут
-  зависать на подключении к БД.
+  После восстановления Docker/PostgreSQL дополнительно пройдены `npm run test:integration` (149
+  integration-тестов) и `npm run test:e2e:api` (10/10 API E2E). Demo seed был обновлён, поэтому
+  локальные demo-пароли снова свежие.
 
 ### Что сделано
 
@@ -2574,14 +2578,15 @@ npm run build
 
 ### Что не подтверждено
 
-- `npm run test:integration` был запущен, но завис без вывода и остановлен вручную. Не считать integration зелёным до повторного прогона на свежей БД.
 - Не выполнен ручной браузерный QA новых экранов на 360/390/768/1280/1440 px, 200% zoom, keyboard и reduced motion.
 - Не проверялся реальный SMTP `verify()` с рабочими доступами.
 - Новые экраны ещё требуют продуктовой приёмки текстов, прав и empty/error/conflict-состояний.
 
 ### Следующая конкретная задача
 
-Повторить `npm run test:integration` после проверки состояния локальной PostgreSQL/dev seed, затем пройти `/admin/setup`, `/admin/departments`, `/admin/users`, `/employee/*` в браузере под synthetic-аккаунтами и зафиксировать найденные дефекты отдельным коммитом.
+Пройти `/admin/setup`, `/admin/departments`, `/admin/users`, `/employee/*` и participant privacy в
+браузере под synthetic-аккаунтами, затем добрать Q-01 deletion lifecycle: admin A12, deletion job,
+фактическое удаление и backup cleanup.
 
 ## Продолжение UI/UX — 17.09.2026
 
@@ -2809,6 +2814,15 @@ M14-notifications этой сессии (см. `docs/knowledge/CHANGELOG.md` 1.2
 *Исходный модуль: `docs/knowledge/CHANGELOG.md`*
 
 # История изменений
+
+## 1.9 — 23.09.2026
+
+Исправлен запуск `apps/worker` на Windows: проверка прямого запуска теперь сравнивает нормализованные
+пути через `fileURLToPath`, поэтому `npm run dev` действительно поднимает worker, доставляет outbox
+в pg-boss и готовит черновики заключений.
+
+После восстановления Docker/PostgreSQL подтверждены проверки: `npm run test:integration` — 9 файлов /
+149 тестов passed; `npm run test:e2e:api` с fresh demo-credentials — 10/10 passed.
 
 ## 1.8 — 23.09.2026
 
