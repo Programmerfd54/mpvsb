@@ -2535,6 +2535,18 @@ PR/изменение описывает проблему, поведение, �
 
 Состояние: **подготовлен проверяемый коммит для review, не финальная приёмка P0**.
 
+### Продолжение 23.09.2026
+
+- `/admin/setup` больше не показывает заглушки после первого шага. Подключены формы SMTP-настроек
+  и шаблона письма, проверка SMTP-соединения, переходы к `/admin/departments` и `/admin/users`,
+  финальная проверка шагов по данным `AdminWorkspace`.
+- Проверки после правки: `npm run typecheck`, `npm run lint`, `npm run test`, `npm run build`.
+- Блокер integration подтверждён как проблема локального Docker/PostgreSQL окружения: `docker version`
+  и `docker compose ps` зависают; `Test-NetConnection` видит порты 55442/55443, но прямой `pg`
+  handshake к `context` и `context_test` завершается `timeout expired`. Пока Docker backend не
+  перезапущен/не восстановлен, `npm run test:integration`, миграции и живой browser-QA с API будут
+  зависать на подключении к БД.
+
 ### Что сделано
 
 - Переведён фокус технического администратора на рабочее пространство: `/admin/setup`, `/admin/departments`, `/admin/users`, SMTP-настройки и шаблон письма. Прежние `/admin/methods*` и `/admin/scenarios*` в UI оставлены как закрытые/упрощённые экраны без обычного редакторского пути техадмина.
@@ -2792,6 +2804,16 @@ M14-notifications этой сессии (см. `docs/knowledge/CHANGELOG.md` 1.2
 *Исходный модуль: `docs/knowledge/CHANGELOG.md`*
 
 # История изменений
+
+## 1.7 — 23.09.2026
+
+Доведён мастер `/admin/setup`: вместо заглушек после первого шага теперь есть рабочие шаги SMTP,
+шаблона письма, переходы к подразделениям и пользователям, а также финальная проверка серверных
+статусов. SMTP-пароль не возвращается в интерфейс; success показывается только после ответа API.
+
+Проверки: `npm run typecheck`, `npm run lint`, `npm run test`, `npm run build` — без ошибок.
+`npm run test:integration` по-прежнему заблокирован локальным Docker/PostgreSQL: порты 55442/55443
+открыты, но `pg`-подключение к обеим БД завершается `timeout expired`, Docker CLI также зависает.
 
 ## 1.6 — 23.09.2026
 
