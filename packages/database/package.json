@@ -19,6 +19,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
     "migrate": "tsx --env-file-if-exists=../../.env src/cli/migrate.ts",
     "reset": "tsx --env-file-if-exists=../../.env src/cli/migrate.ts --reset",
+    "bootstrap": "tsx --env-file-if-exists=../../.env src/cli/bootstrap.ts",
     "seed:demo": "tsx --env-file-if-exists=../../.env src/cli/seed-demo.ts"
   },
   "dependencies": {

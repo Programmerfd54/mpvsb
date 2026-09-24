@@ -10,6 +10,8 @@ export interface RequestActor {
   readonly sessionId?: string;
   /** Организация подтверждена membership или сессией участника, а не телом запроса. */
   readonly organizationId?: string;
+  /** Запись сотрудника, подтверждённая по user_id серверным резолвером. */
+  readonly employeeId?: string;
   readonly permissions?: readonly OrgPermission[];
   readonly isPlatformAdmin?: boolean;
   /** Назначение, к которому привязана сессия участника. */

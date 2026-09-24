@@ -91,6 +91,10 @@ export async function withPlatformOps<T>(
       await tx.$executeRaw`select set_config('app.platform_ops', 'on', true)`;
       return work(tx as TenantTransaction);
     },
-    { timeout: opts.timeoutMs, maxWait: opts.maxWaitMs },
+    {
+      timeout: opts.timeoutMs,
+      maxWait: opts.maxWaitMs,
+      ...(opts.isolationLevel ? { isolationLevel: opts.isolationLevel } : {}),
+    },
   );
 }

@@ -1,5 +1,59 @@
 # Передача работы
 
+## Новая модель администратора и кабинет сотрудника — 23.09.2026
+
+Состояние: **подготовлен проверяемый коммит для review, не финальная приёмка P0**.
+
+### Продолжение 23.09.2026
+
+- `/admin/setup` больше не показывает заглушки после первого шага. Подключены формы SMTP-настроек
+  и шаблона письма, проверка SMTP-соединения, переходы к `/admin/departments` и `/admin/users`,
+  финальная проверка шагов по данным `AdminWorkspace`.
+- Добавлен первый участникский privacy-flow: `/participant/privacy` и
+  `POST /participant/privacy-requests` создают заявку `correction/access/withdrawal` с receipt-кодом
+  по текущей participant-сессии. Это закрывает отсутствие страницы E08 как рабочий вход, но не
+  закрывает полный Q-01: admin A12, deletion request/job, выполнение удаления и backup cleanup ещё
+  не реализованы.
+- Исправлен запуск worker на Windows: `apps/worker/src/main.ts` больше не сравнивает URL модуля с
+  путём через unix-only split, поэтому `npm run dev` реально поднимает worker, outbox доставляется в
+  pg-boss, а черновики заключений появляются без ручного запуска.
+- Проверки после правки: `npm run typecheck`, `npm run lint`, `npm run test`, `npm run build`.
+  После восстановления Docker/PostgreSQL дополнительно пройдены `npm run test:integration` (149
+  integration-тестов) и `npm run test:e2e:api` (10/10 API E2E). Demo seed был обновлён, поэтому
+  локальные demo-пароли снова свежие.
+
+### Что сделано
+
+- Переведён фокус технического администратора на рабочее пространство: `/admin/setup`, `/admin/departments`, `/admin/users`, SMTP-настройки и шаблон письма. Прежние `/admin/methods*` и `/admin/scenarios*` в UI оставлены как закрытые/упрощённые экраны без обычного редакторского пути техадмина.
+- Добавлены backend-сервисы для workspace, departments, users, mail и bootstrap, контракты в `packages/contracts/src/admin.ts`, миграции `0020`–`0024`, зашифрованное хранение SMTP-пароля.
+- Добавлен отдельный employee-контур: guard, API, контракты и страницы `/employee`, `/employee/assessments`, `/employee/assessments/[assignmentId]`, `/employee/settings`.
+- Добавлена публичная `/activate` для активации приглашённых аккаунтов.
+- После переустановки Codex восстановлены сгенерированные workspace-артефакты через `npm run build:packages`; исправлен остановивший typecheck audit outcome в mail-тесте (`failed`, не `failure`).
+
+### Как проверено
+
+```sh
+npm run build:packages
+npm run typecheck
+npm run lint
+npm run test
+npm run build
+```
+
+Результат: команды выше прошли; unit-тесты — 80 passed.
+
+### Что не подтверждено
+
+- Не выполнен ручной браузерный QA новых экранов на 360/390/768/1280/1440 px, 200% zoom, keyboard и reduced motion.
+- Не проверялся реальный SMTP `verify()` с рабочими доступами.
+- Новые экраны ещё требуют продуктовой приёмки текстов, прав и empty/error/conflict-состояний.
+
+### Следующая конкретная задача
+
+Пройти `/admin/setup`, `/admin/departments`, `/admin/users`, `/employee/*` и participant privacy в
+браузере под synthetic-аккаунтами, затем добрать Q-01 deletion lifecycle: admin A12, deletion job,
+фактическое удаление и backup cleanup.
+
 ## Продолжение UI/UX — 17.09.2026
 
 Десктопные доработки календаря, конструктора вопросов, выбора сотрудников и прохождения опроса описаны в [UI_UX_REVIEW.md](UI_UX_REVIEW.md). Мобильная версия отложена по прямому указанию пользователя до отдельного сигнала. Закрытые экраны требуют повторной визуальной приёмки после входа; общий редизайн не объявляется полностью принятым.

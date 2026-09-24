@@ -86,7 +86,12 @@ export class AuthController {
   @Get('me')
   @UseGuards(ManagerOrAdminGuard)
   async me(@Actor() actor: RequestActor): Promise<Envelope<AuthProfile>> {
-    return envelope(await this.auth.profileFor(actor.userId!));
+    return envelope(
+      await this.auth.profileFor(
+        actor.userId!,
+        actor.type as 'platform_admin' | 'manager' | 'employee',
+      ),
+    );
   }
 
   @Post('activate')
@@ -210,7 +215,12 @@ export class AuthController {
   sessionPolicy(
     @Actor() actor: RequestActor,
   ): Envelope<{ idleMinutes: number; absoluteMinutes: number }> {
-    const key = actor.type === 'platform_admin' ? 'platform_admin' : 'manager';
+    const key =
+      actor.type === 'platform_admin'
+        ? 'platform_admin'
+        : actor.type === 'employee'
+          ? 'employee'
+          : 'manager';
     return envelope({ ...SESSION_POLICY[key] });
   }
 }

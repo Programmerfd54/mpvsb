@@ -25,6 +25,7 @@ const envSchema = z.object({
 
   /** Секрет HMAC для хэширования токенов приглашений и сессий. */
   TOKEN_HASH_SECRET: z.string().min(32, 'TOKEN_HASH_SECRET должен быть не короче 32 символов.'),
+  MAIL_CONFIG_ENCRYPTION_KEY: z.string().min(32).optional(),
 
   COOKIE_SECURE: z
     .string()

@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "updatedAt": "2026-09-17",
+  "updatedAt": "2026-09-23",
   "statusMeaning": "Статусы относятся к конкретным задачам. Done документации не означает готовность приложения.",
   "milestones": [
     {
@@ -1707,6 +1707,16 @@
           "kind": "command",
           "command": "npx playwright test --project=api (до пересева demo-базы параллельной сессией)",
           "result": "8 passed, 2 failed по таймауту ожидания (не по утверждениям теста — worker готовил заключение на 146-й секунде при лимите 120с, лимиты подняты до 180/360с). После смены паролей повторный прогон недоступен без свежего db:seed:demo — записано как текущее ограничение проверки, не как дефект тестов."
+        },
+        {
+          "kind": "file",
+          "path": "apps/worker/src/main.ts",
+          "result": "Исправлен direct-run guard worker для Windows: путь entrypoint сравнивается через fileURLToPath/path.resolve, поэтому npm run dev действительно запускает worker и dispatcher outbox."
+        },
+        {
+          "kind": "command",
+          "command": "npm run test:integration && npm run test:e2e:api",
+          "result": "После восстановления Docker/PostgreSQL и fresh db:seed:demo integration прошёл: 9 файлов / 149 тестов passed. API E2E прошёл: 10/10 passed; worker доставил outbox в pg-boss и подготовил черновики заключений."
         },
         {
           "kind": "command",

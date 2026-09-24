@@ -15,6 +15,7 @@ import { AssignmentsModule } from './modules/assignments/assignments.module';
 import { ParticipantModule } from './modules/participant/participant.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { ScenariosModule } from './modules/scenarios/scenarios.module';
+import { EmployeeModule } from './modules/employee/employee.module';
 
 /**
  * Модульный монолит: предметные модули складываются здесь, платформенные
@@ -37,6 +38,7 @@ import { ScenariosModule } from './modules/scenarios/scenarios.module';
     AdminModule,
     AccessGrantsModule,
     NotificationsModule,
+    EmployeeModule,
   ],
 })
 export class AppModule {}

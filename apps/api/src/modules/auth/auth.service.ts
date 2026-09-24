@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import type { AuthProfile, MembershipSummary } from '@context/contracts';
+import { resolveEmployeeAccount } from '@context/database';
 import type { OrgPermission } from '@context/domain';
 
 import { AppError } from '../../platform/errors/app-error';
@@ -22,6 +23,8 @@ export interface LoginResult {
   readonly session: IssuedSession;
   readonly profile: AuthProfile;
 }
+
+type AccountActorType = 'platform_admin' | 'manager' | 'employee';
 
 @Injectable()
 export class AuthService {
@@ -68,13 +71,13 @@ export class AuthService {
       });
     }
 
-    const actorType = user.platform_role === 'platform_admin' ? 'platform_admin' : 'manager';
+    const actorType = await this.resolveActorType(user.id, user.platform_role);
     const session = await this.sessions.createUserSession(user.id, actorType, deviceHint);
     const profile = await this.buildProfile(
       user.id,
       user.display_name,
       user.email_display,
-      actorType === 'platform_admin',
+      actorType,
     );
 
     await this.audit.record({
@@ -88,7 +91,7 @@ export class AuthService {
     return { session, profile };
   }
 
-  async profileFor(userId: string): Promise<AuthProfile> {
+  async profileFor(userId: string, actorType?: AccountActorType): Promise<AuthProfile> {
     const user = await this.prisma.preContext.users.findUnique({
       where: { id: userId },
       select: { display_name: true, email_display: true, platform_role: true },
@@ -96,21 +99,22 @@ export class AuthService {
     if (!user) {
       throw AppError.unauthenticated('Учётная запись не найдена');
     }
-    return this.buildProfile(
-      userId,
-      user.display_name,
-      user.email_display,
-      user.platform_role === 'platform_admin',
-    );
+    const resolvedActorType =
+      actorType ?? (await this.resolveActorType(userId, user.platform_role));
+    return this.buildProfile(userId, user.display_name, user.email_display, resolvedActorType);
   }
 
   private async buildProfile(
     userId: string,
     displayName: string,
     email: string,
-    isPlatformAdmin: boolean,
+    actorType: AccountActorType,
   ): Promise<AuthProfile> {
     const memberships = await this.sessions.listMemberships(userId);
+    const employee =
+      actorType === 'employee'
+        ? await resolveEmployeeAccount(this.prisma.preContext, userId)
+        : null;
     const list: MembershipSummary[] = memberships.map((item) => ({
       organizationId: item.organizationId,
       organizationCode: item.organizationCode,
@@ -123,10 +127,35 @@ export class AuthService {
       userId,
       displayName,
       email,
-      isPlatformAdmin,
+      actorType,
+      isPlatformAdmin: actorType === 'platform_admin',
       memberships: list,
-      defaultOrganizationId: list.length === 1 ? list[0]!.organizationId : null,
+      defaultOrganizationId:
+        actorType === 'employee'
+          ? (employee?.organization_id ?? null)
+          : list.length === 1
+            ? list[0]!.organizationId
+            : null,
+      employeeId: employee?.employee_id ?? null,
     };
+  }
+
+  private async resolveActorType(
+    userId: string,
+    platformRole: string | null,
+  ): Promise<AccountActorType> {
+    if (platformRole === 'platform_admin') return 'platform_admin';
+
+    const memberships = await this.sessions.listMemberships(userId);
+    if (memberships.length > 0) return 'manager';
+
+    const employee = await resolveEmployeeAccount(this.prisma.preContext, userId);
+    if (employee) return 'employee';
+
+    throw AppError.forbidden(
+      'Для учётной записи не назначена активная роль',
+      `Нет membership или записи employee для пользователя ${userId}`,
+    );
   }
 
   /**
@@ -197,13 +226,13 @@ export class AuthService {
       select: { display_name: true, email_display: true, platform_role: true },
     });
 
-    const actorType = user.platform_role === 'platform_admin' ? 'platform_admin' : 'manager';
+    const actorType = await this.resolveActorType(record.user_id, user.platform_role);
     const session = await this.sessions.createUserSession(record.user_id, actorType);
     const profile = await this.buildProfile(
       record.user_id,
       user.display_name,
       user.email_display,
-      actorType === 'platform_admin',
+      actorType,
     );
 
     return { session, profile };

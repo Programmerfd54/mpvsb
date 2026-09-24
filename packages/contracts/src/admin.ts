@@ -67,6 +67,240 @@ export const updateReadinessSchema = z.object({
 
 export type UpdateReadinessInput = z.infer<typeof updateReadinessSchema>;
 
+export const WORKSPACE_SETUP_STEPS = [
+  'company',
+  'mail',
+  'mail_template',
+  'departments',
+  'users',
+  'review',
+] as const;
+
+export const adminWorkspaceSchema = z.object({
+  organizationId: uuidSchema,
+  name: z.string(),
+  logoUrl: z.string().nullable(),
+  revision: z.number().int().positive(),
+  setupCompletedAt: z.iso.datetime({ offset: true }).nullable(),
+  steps: z.array(
+    z.object({
+      key: z.enum(WORKSPACE_SETUP_STEPS),
+      status: z.enum(['pending', 'complete']),
+    }),
+  ),
+});
+
+export type AdminWorkspace = z.infer<typeof adminWorkspaceSchema>;
+
+export const updateAdminWorkspaceSchema = z
+  .object({
+    name: z.string().trim().min(2).max(200).optional(),
+    logoUrl: z.string().trim().url().max(500).nullable().optional(),
+    expectedRevision: z.number().int().positive(),
+  })
+  .refine((value) => value.name !== undefined || value.logoUrl !== undefined, {
+    message: 'Укажите хотя бы одно изменение',
+  });
+
+export type UpdateAdminWorkspace = z.infer<typeof updateAdminWorkspaceSchema>;
+
+export const adminMailSettingsSchema = z.object({
+  host: z.string(),
+  port: z.number().int(),
+  secure: z.boolean(),
+  username: z.string().nullable(),
+  passwordConfigured: z.boolean(),
+  fromEmail: z.string(),
+  fromName: z.string(),
+  revision: z.number().int().positive(),
+  verifiedAt: z.iso.datetime({ offset: true }).nullable(),
+  lastTestErrorCode: z.string().nullable(),
+});
+export type AdminMailSettings = z.infer<typeof adminMailSettingsSchema>;
+
+export const saveAdminMailSettingsSchema = z.object({
+  host: z.string().trim().min(1).max(253),
+  port: z.number().int().min(1).max(65535),
+  secure: z.boolean(),
+  username: z.string().trim().max(320).nullable(),
+  password: z.string().min(1).max(1000).nullable().optional(),
+  fromEmail: z.string().trim().toLowerCase().email().max(320),
+  fromName: z.string().trim().min(1).max(200),
+  expectedRevision: z.number().int().positive().nullable(),
+});
+export type SaveAdminMailSettings = z.infer<typeof saveAdminMailSettingsSchema>;
+
+export const adminMailTestSchema = z.object({
+  connected: z.boolean(),
+  testedAt: z.iso.datetime({ offset: true }),
+  message: z.string(),
+});
+export type AdminMailTest = z.infer<typeof adminMailTestSchema>;
+
+export const adminMailTemplateSchema = z.object({
+  subject: z.string(),
+  greeting: z.string(),
+  body: z.string(),
+  buttonLabel: z.string(),
+  signature: z.string(),
+  supportContact: z.string().nullable(),
+  status: z.enum(['draft', 'published']),
+  revision: z.number().int().positive(),
+  publishedAt: z.iso.datetime({ offset: true }).nullable(),
+});
+export type AdminMailTemplate = z.infer<typeof adminMailTemplateSchema>;
+
+export const saveAdminMailTemplateSchema = z.object({
+  subject: z.string().trim().min(1).max(200),
+  greeting: z.string().trim().min(1).max(500),
+  body: z.string().trim().min(1).max(3000),
+  buttonLabel: z.string().trim().min(1).max(80),
+  signature: z.string().trim().min(1).max(500),
+  supportContact: z.string().trim().max(320).nullable(),
+  expectedRevision: z.number().int().positive().nullable(),
+  publish: z.boolean().default(false),
+});
+export type SaveAdminMailTemplate = z.infer<typeof saveAdminMailTemplateSchema>;
+
+export const adminDepartmentSchema = z.object({
+  id: uuidSchema,
+  name: z.string(),
+  status: z.enum(['active', 'archived']),
+  employeeCount: z.number().int().nonnegative(),
+  managerCount: z.number().int().nonnegative(),
+  revision: z.number().int().positive(),
+  createdAt: z.iso.datetime({ offset: true }),
+});
+
+export type AdminDepartment = z.infer<typeof adminDepartmentSchema>;
+
+export const adminDepartmentDetailSchema = adminDepartmentSchema.extend({
+  managers: z.array(
+    z.object({
+      userId: uuidSchema,
+      displayName: z.string(),
+      assignedAt: z.iso.datetime({ offset: true }),
+    }),
+  ),
+  employees: z.array(
+    z.object({
+      employeeId: uuidSchema,
+      displayName: z.string().nullable(),
+      jobTitle: z.string().nullable(),
+      archived: z.boolean(),
+      revision: z.number().int().positive(),
+    }),
+  ),
+  availableManagers: z.array(
+    z.object({
+      userId: uuidSchema,
+      displayName: z.string(),
+      membershipStatus: z.enum(['invited', 'active']),
+    }),
+  ),
+});
+
+export type AdminDepartmentDetail = z.infer<typeof adminDepartmentDetailSchema>;
+
+export const adminDepartmentListQuerySchema = z.object({
+  query: z.string().trim().max(200).optional(),
+  status: z.enum(['active', 'archived', 'all']).default('active'),
+});
+
+export type AdminDepartmentListQuery = z.infer<typeof adminDepartmentListQuerySchema>;
+
+export const createAdminDepartmentSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+});
+
+export type CreateAdminDepartment = z.infer<typeof createAdminDepartmentSchema>;
+
+export const updateAdminDepartmentSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  expectedRevision: z.number().int().positive(),
+});
+
+export type UpdateAdminDepartment = z.infer<typeof updateAdminDepartmentSchema>;
+
+export const archiveAdminDepartmentSchema = z.object({
+  expectedRevision: z.number().int().positive(),
+});
+
+export type ArchiveAdminDepartment = z.infer<typeof archiveAdminDepartmentSchema>;
+
+export const assignDepartmentManagerSchema = z.object({
+  userId: uuidSchema,
+});
+
+export type AssignDepartmentManager = z.infer<typeof assignDepartmentManagerSchema>;
+
+export const transferEmployeeSchema = z.object({
+  targetDepartmentId: uuidSchema,
+  expectedEmployeeRevision: z.number().int().positive(),
+  reason: z.string().trim().min(5).max(1000),
+  activeAssignmentsAction: z.enum(['keep_current_scope', 'cancel']),
+});
+
+export type TransferEmployee = z.infer<typeof transferEmployeeSchema>;
+
+export const transferEmployeeResultSchema = z.object({
+  employeeId: uuidSchema,
+  sourceDepartmentId: uuidSchema,
+  targetDepartmentId: uuidSchema,
+  cancelledAssignments: z.number().int().nonnegative(),
+  employeeRevision: z.number().int().positive(),
+});
+
+export type TransferEmployeeResult = z.infer<typeof transferEmployeeResultSchema>;
+
+export const adminUserSchema = z.object({
+  userId: uuidSchema.nullable(),
+  employeeId: uuidSchema.nullable(),
+  displayName: z.string(),
+  jobTitle: z.string().nullable(),
+  email: z.string().nullable(),
+  role: z.enum(['manager', 'reviewer', 'employee']),
+  departments: z.array(z.object({ id: uuidSchema, name: z.string() })),
+  deliveryStatus: z.enum(['pending', 'sent', 'delivered', 'failed', 'unavailable']),
+  activationStatus: z.enum(['pending', 'activated', 'blocked']),
+  lastLoginAt: z.iso.datetime({ offset: true }).nullable(),
+});
+
+export type AdminUser = z.infer<typeof adminUserSchema>;
+
+export const inviteAdminUserSchema = z
+  .object({
+    displayName: z.string().trim().min(1).max(200),
+    jobTitle: z.string().trim().max(120).nullable().optional(),
+    email: z.string().trim().toLowerCase().email().max(320),
+    role: z.enum(['manager', 'reviewer', 'employee']),
+    departmentIds: z.array(uuidSchema).min(1),
+  })
+  .superRefine((value, context) => {
+    if (value.role === 'employee' && value.departmentIds.length !== 1) {
+      context.addIssue({
+        code: 'custom',
+        path: ['departmentIds'],
+        message: 'Для сотрудника выберите одно подразделение',
+      });
+    }
+  });
+
+export type InviteAdminUser = z.infer<typeof inviteAdminUserSchema>;
+
+export const adminUserInvitationSchema = z.object({
+  user: adminUserSchema,
+  activation: z.object({
+    url: z.string(),
+    expiresAt: z.iso.datetime({ offset: true }),
+    secretAvailable: z.boolean(),
+  }),
+  deliveryStatus: z.literal('pending'),
+  deliveryMessage: z.string(),
+});
+
+export type AdminUserInvitation = z.infer<typeof adminUserInvitationSchema>;
+
 // ——— Методики ———
 
 export const adminMethodSchema = z.object({

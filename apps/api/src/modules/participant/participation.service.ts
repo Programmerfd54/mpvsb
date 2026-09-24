@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { randomBytes } from 'node:crypto';
 
 import {
   answerResponseSchema,
@@ -9,6 +10,8 @@ import {
   type ParticipantAttemptDetail,
   type ParticipantAttemptSummary,
   type ParticipantCompletion,
+  type PrivacyReceipt,
+  type PrivacyRequestInput,
   type ParticipantSession,
   type ParticipantTerms,
   type SaveAnswerResult,
@@ -125,6 +128,74 @@ export class ParticipationService {
         resourceId: assignment.id,
       });
 
+      return {
+        secret,
+        maxAgeSeconds: Math.max(60, Math.floor((cappedExpiry.getTime() - now.getTime()) / 1000)),
+      };
+    });
+  }
+
+  /** Открывает обычный participant-поток из авторизованного кабинета сотрудника. */
+  async openForEmployee(
+    actor: RequestActor,
+    assignmentId: string,
+  ): Promise<IssuedParticipantSession> {
+    if (!actor.organizationId || !actor.employeeId) {
+      throw AppError.forbidden('Сессия сотрудника не содержит область доступа');
+    }
+    const organizationId = actor.organizationId;
+    const now = new Date();
+
+    return this.prisma.tenant({ organizationId }, async (tx) => {
+      const assignment = await tx.assignments.findFirst({
+        where: { id: assignmentId, organization_id: organizationId, employee_id: actor.employeeId },
+        select: {
+          id: true,
+          state: true,
+          due_at: true,
+          invitations: { select: { id: true, expires_at: true, revoked_at: true } },
+        },
+      });
+      if (!assignment || !acceptsParticipation(assignment.state as AssignmentState)) {
+        throw AppError.notFound('Оценка не найдена или больше не принимает ответы');
+      }
+      if (
+        !assignment.invitations ||
+        assignment.invitations.revoked_at ||
+        assignment.invitations.expires_at <= now
+      ) {
+        throw AppError.conflict('Срок участия истёк. Обратитесь к ответственному руководителю.');
+      }
+
+      await tx.participant_sessions.updateMany({
+        where: { organization_id: organizationId, assignment_id: assignment.id, revoked_at: null },
+        data: { revoked_at: now },
+      });
+      const secret = generateSecret();
+      const policy = SESSION_POLICY.participant;
+      const policyExpiry = new Date(now.getTime() + policy.absoluteMinutes * 60_000);
+      const cappedExpiry = [policyExpiry, assignment.invitations.expires_at, assignment.due_at]
+        .filter((value): value is Date => value instanceof Date)
+        .reduce((earliest, value) => (value < earliest ? value : earliest), policyExpiry);
+
+      await tx.participant_sessions.create({
+        data: {
+          organization_id: organizationId,
+          assignment_id: assignment.id,
+          invitation_id: assignment.invitations.id,
+          session_hash: hashSecret(secret),
+          idle_expires_at: new Date(now.getTime() + policy.idleMinutes * 60_000),
+          absolute_expires_at: cappedExpiry,
+        },
+      });
+      await this.audit.recordIn(tx, {
+        action: 'participation.session_opened',
+        outcome: 'success',
+        organizationId,
+        resourceType: 'assignment',
+        resourceId: assignment.id,
+        metadata: { source: 'employee_cabinet' },
+      });
       return {
         secret,
         maxAgeSeconds: Math.max(60, Math.floor((cappedExpiry.getTime() - now.getTime()) / 1000)),
@@ -668,6 +739,59 @@ export class ParticipationService {
         explanation: feedbackAvailable
           ? 'После проверки вам будет доступна согласованная краткая обратная связь.'
           : 'Развёрнутое заключение предназначено руководителю. Вам доступно подтверждение участия; срок подготовки заранее не назван, потому что он зависит от проверки человеком.',
+      };
+    });
+  }
+
+  async createPrivacyRequest(
+    actor: RequestActor,
+    input: PrivacyRequestInput,
+  ): Promise<PrivacyReceipt> {
+    const { organizationId, assignmentId } = requireScope(actor);
+
+    return this.prisma.tenant({ organizationId }, async (tx) => {
+      const assignment = await tx.assignments.findFirst({
+        where: { id: assignmentId, organization_id: organizationId },
+        select: { id: true, employee_id: true },
+      });
+      if (!assignment) {
+        throw AppError.notFound('Участие не найдено');
+      }
+
+      const receiptCode = `PR-${randomBytes(5).toString('hex').toUpperCase()}`;
+      const created = await tx.privacy_requests.create({
+        data: {
+          organization_id: organizationId,
+          subject_type: 'participant',
+          assignment_id: assignment.id,
+          employee_id: assignment.employee_id,
+          request_type: input.requestType,
+          description: input.description,
+          receipt_code: receiptCode,
+        },
+        select: {
+          receipt_code: true,
+          request_type: true,
+          state: true,
+          requested_at: true,
+        },
+      });
+
+      await this.audit.recordIn(tx, {
+        action: 'privacy.request_created',
+        outcome: 'success',
+        organizationId,
+        resourceType: 'privacy_request',
+        metadata: { requestType: input.requestType, subjectType: 'participant' },
+      });
+
+      return {
+        receiptCode: created.receipt_code,
+        requestType: created.request_type as PrivacyReceipt['requestType'],
+        state: created.state,
+        submittedAt: created.requested_at.toISOString(),
+        explanation:
+          'Заявка получена. Ответственный администратор проверит её по внутренней процедуре; удаление данных выполняется отдельным подтверждённым процессом.',
       };
     });
   }

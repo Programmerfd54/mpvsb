@@ -4,6 +4,7 @@ import type { FastifyReply } from 'fastify';
 import {
   exchangeInvitationRequestSchema,
   giveConsentRequestSchema,
+  privacyRequestInputSchema,
   saveAnswerRequestSchema,
   submitAttemptRequestSchema,
   type Envelope,
@@ -11,6 +12,7 @@ import {
   type ParticipantAttemptDetail,
   type ParticipantAttemptSummary,
   type ParticipantCompletion,
+  type PrivacyReceipt,
   type ParticipantSession,
   type ParticipantTerms,
   type SaveAnswerResult,
@@ -164,6 +166,16 @@ export class ParticipantController {
   @UseGuards(ParticipantGuard)
   async completion(@Actor() actor: RequestActor): Promise<Envelope<ParticipantCompletion>> {
     return envelope(await this.participation.completion(actor));
+  }
+
+  @Post('privacy-requests')
+  @UseGuards(ParticipantGuard)
+  async createPrivacyRequest(
+    @Actor() actor: RequestActor,
+    @Body() body: unknown,
+  ): Promise<Envelope<PrivacyReceipt>> {
+    const input = parseInput(privacyRequestInputSchema, body);
+    return envelope(await this.participation.createPrivacyRequest(actor, input));
   }
 
   @Post('logout')

@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 
-import { resolveParticipantSession, resolveUserMemberships } from '@context/database';
+import {
+  resolveEmployeeAccount,
+  resolveParticipantSession,
+  resolveUserMemberships,
+} from '@context/database';
 import { SESSION_POLICY, type OrgPermission } from '@context/domain';
 
 import { PrismaService } from '../database/prisma.service';
@@ -23,7 +27,7 @@ export class SessionService {
 
   async createUserSession(
     userId: string,
-    actorType: 'manager' | 'platform_admin',
+    actorType: 'manager' | 'platform_admin' | 'employee',
     deviceHint?: string,
   ): Promise<IssuedSession> {
     const policy = SESSION_POLICY[actorType];
@@ -79,9 +83,20 @@ export class SessionService {
       return null;
     }
 
-    const actorType = session.actor_type === 'platform_admin' ? 'platform_admin' : 'manager';
+    if (!['platform_admin', 'manager', 'employee'].includes(session.actor_type)) {
+      return null;
+    }
+    const actorType = session.actor_type as 'platform_admin' | 'manager' | 'employee';
     if (actorType === 'platform_admin' && session.users.platform_role !== 'platform_admin') {
       // Роль отозвана после выдачи сессии — доступ закрывается сразу.
+      return null;
+    }
+
+    const employee =
+      actorType === 'employee'
+        ? await resolveEmployeeAccount(this.prisma.preContext, session.user_id)
+        : null;
+    if (actorType === 'employee' && !employee) {
       return null;
     }
 
@@ -101,6 +116,8 @@ export class SessionService {
       userId: session.user_id,
       sessionId: session.id,
       isPlatformAdmin: actorType === 'platform_admin',
+      organizationId: employee?.organization_id,
+      employeeId: employee?.employee_id,
     };
   }
 

@@ -26,6 +26,7 @@ export const DEFAULT_ACTIVE_EMPLOYEE_LIMIT = 500;
 export const SESSION_POLICY = {
   manager: { idleMinutes: 8 * 60, absoluteMinutes: 7 * 24 * 60 },
   platform_admin: { idleMinutes: 30, absoluteMinutes: 12 * 60 },
+  employee: { idleMinutes: 8 * 60, absoluteMinutes: 7 * 24 * 60 },
   participant: { idleMinutes: 2 * 60, absoluteMinutes: 24 * 60 },
 } as const;
 

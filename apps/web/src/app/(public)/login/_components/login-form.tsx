@@ -42,6 +42,10 @@ export function LoginForm() {
         router.push('/admin');
         return;
       }
+      if (profile.actorType === 'employee') {
+        router.push('/employee');
+        return;
+      }
       // Одна организация — открываем сразу, несколько — просим выбрать.
       router.push(profile.defaultOrganizationId ? '/app' : '/app/organizations');
     } catch (cause) {

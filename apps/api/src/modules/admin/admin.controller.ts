@@ -2,74 +2,68 @@ import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@ne
 
 import {
   adminAuditFilterSchema,
+  adminDepartmentListQuerySchema,
   adminJobFilterSchema,
-  createMethodInputSchema,
-  createMethodVersionInputSchema,
-  createOrganizationInputSchema,
-  createReportingPolicyInputSchema,
-  createScenarioInputSchema,
-  createScenarioVersionInputSchema,
-  updateMethodVersionInputSchema,
-  updateScenarioVersionInputSchema,
+  saveAdminMailSettingsSchema,
+  saveAdminMailTemplateSchema,
+  archiveAdminDepartmentSchema,
+  assignDepartmentManagerSchema,
+  createAdminDepartmentSchema,
+  inviteAdminUserSchema,
+  updateAdminWorkspaceSchema,
+  updateAdminDepartmentSchema,
+  transferEmployeeSchema,
   suspendOrganizationSchema,
   updateReadinessSchema,
   type AdminAuditDetails,
   type AdminAuditEvent,
+  type AdminDepartment,
+  type AdminDepartmentDetail,
   type AdminJob,
   type AdminJobDetails,
+  type AdminMailSettings,
+  type AdminMailTemplate,
+  type AdminMailTest,
   type AdminOperationsFacets,
-  type AdminMethod,
-  type AdminMethodVersion,
   type AdminOrganization,
   type AdminOverview,
-  type AdminScenario,
-  type AdminScenarioVersion,
+  type AdminWorkspace,
+  type AdminUser,
+  type AdminUserInvitation,
+  type TransferEmployeeResult,
   type Envelope,
-  type IssuedLink,
-  type AvailableMethodVersion,
-  type MethodCheckResult,
-  type MethodImportPreview,
   type ReadinessCheck,
-  type ReportingPolicy,
-  type ScenarioIssue,
 } from '@context/contracts';
-import { CONTENT_VERSION_STATES, type ContentVersionState } from '@context/domain';
 import { z } from 'zod';
 
 import { Actor } from '../../platform/auth/decorators';
 import { AdminGuard } from '../../platform/auth/guards/admin.guard';
 import { currentRequestId, type RequestActor } from '../../platform/request/request-context';
 import { parseInput } from '../../platform/validation/zod.pipe';
+import { uuidParam } from '../../platform/validation/uuid-param';
 import { AuthService } from '../auth/auth.service';
-import { AdminContentService } from './admin-content.service';
 import { AdminOperationsService } from './admin-operations.service';
 import { AdminOrganizationsService } from './admin-organizations.service';
-import { MethodEditorService } from './method-editor.service';
-import { ScenarioEditorService } from './scenario-editor.service';
+import { AdminWorkspaceService } from './admin-workspace.service';
+import { AdminUsersService } from './admin-users.service';
+import { AdminDepartmentsService } from './admin-departments.service';
+import { AdminMailService } from './admin-mail.service';
 
 function envelope<T>(data: T): Envelope<T> {
   return { data, meta: { requestId: currentRequestId() } };
 }
 
-const transitionSchema = z.object({ status: z.enum(CONTENT_VERSION_STATES) });
-
-/**
- * Кабинет администратора платформы.
- *
- * Все маршруты закрыты `AdminGuard`: принимается только сессия администратора,
- * cookie участника и обычного руководителя здесь не подходят. Доступа к
- * содержанию оценок эта роль не даёт (ТЗ 01.2).
- */
 @Controller('admin')
 @UseGuards(AdminGuard)
 export class AdminController {
   constructor(
     private readonly organizations: AdminOrganizationsService,
-    private readonly content: AdminContentService,
     private readonly operations: AdminOperationsService,
-    private readonly methodEditor: MethodEditorService,
-    private readonly scenarioEditor: ScenarioEditorService,
+    private readonly workspace: AdminWorkspaceService,
+    private readonly departments: AdminDepartmentsService,
+    private readonly users: AdminUsersService,
     private readonly auth: AuthService,
+    private readonly mail: AdminMailService,
   ) {}
 
   @Get('overview')
@@ -77,34 +71,167 @@ export class AdminController {
     return envelope(await this.operations.overview());
   }
 
-  // ——— Организации ———
+  @Get('workspace')
+  async getWorkspace(): Promise<Envelope<AdminWorkspace>> {
+    return envelope(await this.workspace.get());
+  }
+
+  @Patch('workspace')
+  async updateWorkspace(@Body() body: unknown): Promise<Envelope<AdminWorkspace>> {
+    return envelope(await this.workspace.update(parseInput(updateAdminWorkspaceSchema, body)));
+  }
+
+  @Get('mail')
+  async getMail(): Promise<Envelope<AdminMailSettings | null>> {
+    return envelope(await this.mail.getSettings());
+  }
+
+  @Patch('mail')
+  async saveMail(
+    @Actor() actor: RequestActor,
+    @Body() body: unknown,
+  ): Promise<Envelope<AdminMailSettings>> {
+    return envelope(
+      await this.mail.saveSettings(parseInput(saveAdminMailSettingsSchema, body), actor.userId!),
+    );
+  }
+
+  @Post('mail/test')
+  async testMail(@Actor() actor: RequestActor): Promise<Envelope<AdminMailTest>> {
+    return envelope(await this.mail.test(actor.userId!));
+  }
+
+  @Get('mail-template')
+  async getMailTemplate(): Promise<Envelope<AdminMailTemplate>> {
+    return envelope(await this.mail.getTemplate());
+  }
+
+  @Patch('mail-template')
+  async saveMailTemplate(
+    @Actor() actor: RequestActor,
+    @Body() body: unknown,
+  ): Promise<Envelope<AdminMailTemplate>> {
+    return envelope(
+      await this.mail.saveTemplate(
+        parseInput(saveAdminMailTemplateSchema, body),
+        actor.userId!,
+      ),
+    );
+  }
+
+  @Get('departments')
+  async listDepartments(@Query() query: unknown): Promise<Envelope<AdminDepartment[]>> {
+    return envelope(await this.departments.list(parseInput(adminDepartmentListQuerySchema, query)));
+  }
+
+  @Post('departments')
+  async createDepartment(@Body() body: unknown): Promise<Envelope<AdminDepartmentDetail>> {
+    return envelope(await this.departments.create(parseInput(createAdminDepartmentSchema, body)));
+  }
+
+  @Get('departments/:departmentId')
+  async getDepartment(
+    @Param('departmentId') departmentId: string,
+  ): Promise<Envelope<AdminDepartmentDetail>> {
+    return envelope(await this.departments.get(uuidParam(departmentId, 'departmentId')));
+  }
+
+  @Patch('departments/:departmentId')
+  async updateDepartment(
+    @Param('departmentId') departmentId: string,
+    @Body() body: unknown,
+  ): Promise<Envelope<AdminDepartmentDetail>> {
+    return envelope(
+      await this.departments.update(
+        uuidParam(departmentId, 'departmentId'),
+        parseInput(updateAdminDepartmentSchema, body),
+      ),
+    );
+  }
+
+  @Post('departments/:departmentId/archive')
+  async archiveDepartment(
+    @Param('departmentId') departmentId: string,
+    @Body() body: unknown,
+  ): Promise<Envelope<AdminDepartmentDetail>> {
+    const input = parseInput(archiveAdminDepartmentSchema, body);
+    return envelope(
+      await this.departments.archive(
+        uuidParam(departmentId, 'departmentId'),
+        input.expectedRevision,
+      ),
+    );
+  }
+
+  @Post('departments/:departmentId/managers')
+  async assignDepartmentManager(
+    @Param('departmentId') departmentId: string,
+    @Body() body: unknown,
+  ): Promise<Envelope<AdminDepartmentDetail>> {
+    const input = parseInput(assignDepartmentManagerSchema, body);
+    return envelope(
+      await this.departments.assignManager(uuidParam(departmentId, 'departmentId'), input.userId),
+    );
+  }
+
+  @Post('departments/:departmentId/managers/:userId/revoke')
+  async revokeDepartmentManager(
+    @Param('departmentId') departmentId: string,
+    @Param('userId') userId: string,
+  ): Promise<Envelope<AdminDepartmentDetail>> {
+    return envelope(
+      await this.departments.revokeManager(
+        uuidParam(departmentId, 'departmentId'),
+        uuidParam(userId, 'userId'),
+      ),
+    );
+  }
+
+  @Post('departments/:departmentId/employees/:employeeId/transfer')
+  async transferDepartmentEmployee(
+    @Actor() actor: RequestActor,
+    @Param('departmentId') departmentId: string,
+    @Param('employeeId') employeeId: string,
+    @Body() body: unknown,
+  ): Promise<Envelope<TransferEmployeeResult>> {
+    return envelope(
+      await this.departments.transferEmployee(
+        uuidParam(departmentId, 'departmentId'),
+        uuidParam(employeeId, 'employeeId'),
+        actor.userId!,
+        parseInput(transferEmployeeSchema, body),
+      ),
+    );
+  }
+
+  @Get('users')
+  async listUsers(): Promise<Envelope<AdminUser[]>> {
+    return envelope(await this.users.list());
+  }
+
+  @Post('users')
+  async inviteUser(
+    @Actor() actor: RequestActor,
+    @Body() body: unknown,
+  ): Promise<Envelope<AdminUserInvitation>> {
+    const input = parseInput(inviteAdminUserSchema, body);
+    const created = await this.users.invite(input, actor.userId!);
+    const token = await this.auth.issueAccountToken(created.userId, 'activation');
+    return envelope({
+      user: await this.users.get(created.userId),
+      activation: {
+        url: `/activate#token=${token.token}`,
+        expiresAt: token.expiresAt.toISOString(),
+        secretAvailable: true,
+      },
+      deliveryStatus: 'pending',
+      deliveryMessage: 'SMTP ещё не настроен. Передайте одноразовую ссылку вручную.',
+    });
+  }
 
   @Get('organizations')
   async listOrganizations(): Promise<Envelope<AdminOrganization[]>> {
     return envelope(await this.organizations.list());
-  }
-
-  @Post('organizations')
-  async createOrganization(
-    @Actor() actor: RequestActor,
-    @Body() body: unknown,
-  ): Promise<Envelope<{ organization: AdminOrganization; ownerActivation: IssuedLink | null }>> {
-    const input = parseInput(createOrganizationInputSchema, body);
-    const created = await this.organizations.create(input, actor.userId!);
-    const organization = await this.organizations.get(created.organizationId);
-
-    // Ссылка активации выпускается только новому владельцу и возвращается один раз.
-    let ownerActivation: IssuedLink | null = null;
-    if (created.ownerIsNew) {
-      const token = await this.auth.issueAccountToken(created.ownerUserId, 'activation');
-      ownerActivation = {
-        url: `/activate#token=${token.token}`,
-        expiresAt: token.expiresAt.toISOString(),
-        secretAvailable: true,
-      };
-    }
-
-    return envelope({ organization, ownerActivation });
   }
 
   @Get('organizations/:orgId')
@@ -141,177 +268,6 @@ export class AdminController {
     return envelope(await this.organizations.updateReadiness(orgId, input, actor.userId!));
   }
 
-  // ——— Методики ———
-
-  @Get('methods')
-  async listMethods(): Promise<Envelope<AdminMethod[]>> {
-    return envelope(await this.content.listMethods());
-  }
-
-  /** Новая методика вместе с первым черновиком версии. */
-  @Post('methods')
-  async createMethod(
-    @Actor() actor: RequestActor,
-    @Body() body: unknown,
-  ): Promise<Envelope<AdminMethodVersion>> {
-    const input = parseInput(createMethodInputSchema, body);
-    return envelope(await this.methodEditor.createMethod(input, actor.userId!));
-  }
-
-  /** Новая версия существующей методики: опубликованная не редактируется. */
-  @Post('methods/:methodId/versions')
-  async createMethodVersion(
-    @Actor() actor: RequestActor,
-    @Param('methodId') methodId: string,
-    @Body() body: unknown,
-  ): Promise<Envelope<AdminMethodVersion>> {
-    const input = parseInput(createMethodVersionInputSchema, body);
-    return envelope(await this.methodEditor.createVersion(methodId, input, actor.userId!));
-  }
-
-  @Patch('method-versions/:versionId')
-  async updateMethodVersion(
-    @Actor() actor: RequestActor,
-    @Param('versionId') versionId: string,
-    @Body() body: unknown,
-  ): Promise<Envelope<AdminMethodVersion>> {
-    const input = parseInput(updateMethodVersionInputSchema, body);
-    return envelope(await this.methodEditor.updateDraft(versionId, input, actor.userId!));
-  }
-
-  /** Замечания по открытой версии: ссылки шкал, баллы вариантов, диапазоны. */
-  @Get('method-versions/:versionId/issues')
-  async methodIssues(
-    @Param('versionId') versionId: string,
-  ): Promise<Envelope<MethodImportPreview['issues']>> {
-    return envelope(await this.methodEditor.issuesFor(versionId));
-  }
-
-  /** Разбор импортируемого JSON без записи: решение принимает человек. */
-  @Post('method-versions/import-preview')
-  importPreview(@Body() body: unknown): Envelope<MethodImportPreview> {
-    return envelope(this.methodEditor.previewImport(body));
-  }
-
-  @Get('method-versions/:versionId')
-  async getMethodVersion(
-    @Param('versionId') versionId: string,
-  ): Promise<Envelope<AdminMethodVersion>> {
-    return envelope(await this.content.getMethodVersion(versionId));
-  }
-
-  /** Прогон контрольных примеров. Проверяет ключи, а не значимость методики. */
-  @Post('method-versions/:versionId/check')
-  async checkMethodVersion(
-    @Param('versionId') versionId: string,
-  ): Promise<Envelope<MethodCheckResult>> {
-    return envelope(await this.content.checkMethodVersion(versionId));
-  }
-
-  @Post('method-versions/:versionId/transition')
-  async transitionMethodVersion(
-    @Actor() actor: RequestActor,
-    @Param('versionId') versionId: string,
-    @Body() body: unknown,
-  ): Promise<Envelope<AdminMethodVersion>> {
-    const input = parseInput(transitionSchema, body);
-    return envelope(
-      await this.content.transitionMethodVersion(
-        versionId,
-        input.status as ContentVersionState,
-        actor.userId!,
-      ),
-    );
-  }
-
-  // ——— Сценарии ———
-
-  @Get('scenarios')
-  async listScenarios(): Promise<Envelope<AdminScenario[]>> {
-    return envelope(await this.content.listScenarios());
-  }
-
-  /** Новый сценарий с первым черновиком версии. */
-  @Post('scenarios')
-  async createScenario(
-    @Actor() actor: RequestActor,
-    @Body() body: unknown,
-  ): Promise<Envelope<AdminScenarioVersion>> {
-    const input = parseInput(createScenarioInputSchema, body);
-    return envelope(await this.scenarioEditor.createScenario(input, actor.userId!));
-  }
-
-  @Post('scenarios/:scenarioId/versions')
-  async createScenarioVersion(
-    @Actor() actor: RequestActor,
-    @Param('scenarioId') scenarioId: string,
-    @Body() body: unknown,
-  ): Promise<Envelope<AdminScenarioVersion>> {
-    const input = parseInput(createScenarioVersionInputSchema, body);
-    return envelope(await this.scenarioEditor.createVersion(scenarioId, input, actor.userId!));
-  }
-
-  @Patch('scenario-versions/:versionId')
-  async updateScenarioVersion(
-    @Actor() actor: RequestActor,
-    @Param('versionId') versionId: string,
-    @Body() body: unknown,
-  ): Promise<Envelope<AdminScenarioVersion>> {
-    const input = parseInput(updateScenarioVersionInputSchema, body);
-    return envelope(await this.scenarioEditor.updateDraft(versionId, input, actor.userId!));
-  }
-
-  @Get('scenario-versions/:versionId/issues')
-  async scenarioIssues(@Param('versionId') versionId: string): Promise<Envelope<ScenarioIssue[]>> {
-    return envelope(await this.scenarioEditor.issuesFor(versionId));
-  }
-
-  /** Версии методик, доступные для включения в сценарий. */
-  @Get('available-method-versions')
-  async availableMethods(): Promise<Envelope<AvailableMethodVersion[]>> {
-    return envelope(await this.scenarioEditor.availableMethods());
-  }
-
-  @Get('reporting-policies')
-  async listReportingPolicies(): Promise<Envelope<ReportingPolicy[]>> {
-    return envelope(await this.scenarioEditor.listReportingPolicies());
-  }
-
-  @Post('reporting-policies')
-  async createReportingPolicy(
-    @Actor() actor: RequestActor,
-    @Body() body: unknown,
-  ): Promise<Envelope<ReportingPolicy>> {
-    const input = parseInput(createReportingPolicyInputSchema, body);
-    return envelope(await this.scenarioEditor.createReportingPolicy(input, actor.userId!));
-  }
-
-  @Get('scenario-versions/:versionId')
-  async getScenarioVersion(
-    @Param('versionId') versionId: string,
-  ): Promise<Envelope<AdminScenarioVersion>> {
-    return envelope(await this.content.getScenarioVersion(versionId));
-  }
-
-  @Post('scenario-versions/:versionId/transition')
-  async transitionScenarioVersion(
-    @Actor() actor: RequestActor,
-    @Param('versionId') versionId: string,
-    @Body() body: unknown,
-  ): Promise<Envelope<AdminScenarioVersion>> {
-    const input = parseInput(transitionSchema, body);
-    return envelope(
-      await this.content.transitionScenarioVersion(
-        versionId,
-        input.status as ContentVersionState,
-        actor.userId!,
-      ),
-    );
-  }
-
-  // ——— Эксплуатация ———
-
-  /** Значения фильтров: перечисляется только то, что действительно встречается. */
   @Get('operations/facets')
   async facets(): Promise<Envelope<AdminOperationsFacets>> {
     return envelope(await this.operations.facets());
@@ -319,11 +275,9 @@ export class AdminController {
 
   @Get('jobs')
   async jobs(@Query() query: unknown): Promise<Envelope<AdminJob[]>> {
-    const filter = parseInput(adminJobFilterSchema, query);
-    return envelope(await this.operations.jobs(filter));
+    return envelope(await this.operations.jobs(parseInput(adminJobFilterSchema, query)));
   }
 
-  /** Технические детали задания. Само обращение записывается в аудит. */
   @Get('jobs/:jobId')
   async jobDetails(
     @Actor() actor: RequestActor,
@@ -332,10 +286,6 @@ export class AdminController {
     return envelope(await this.operations.jobDetails(jobId, actor.userId!));
   }
 
-  /**
-   * Повтор задания. Условия проверяются заново: отменённое назначение,
-   * отозванное согласие и устаревшее поколение данных повтор не пропускают.
-   */
   @Post('jobs/:jobId/retry')
   async retryJob(
     @Actor() actor: RequestActor,
@@ -356,11 +306,9 @@ export class AdminController {
 
   @Get('audit')
   async audit(@Query() query: unknown): Promise<Envelope<AdminAuditEvent[]>> {
-    const filter = parseInput(adminAuditFilterSchema, query);
-    return envelope(await this.operations.auditEvents(filter));
+    return envelope(await this.operations.auditEvents(parseInput(adminAuditFilterSchema, query)));
   }
 
-  /** Развёрнутая запись аудита. Скрытые поля показываются именем, не значением. */
   @Get('audit/:eventId')
   async auditDetails(
     @Actor() actor: RequestActor,

@@ -13,3 +13,4 @@ export * from './participant';
 export * from './reports';
 export * from './admin';
 export * from './notifications';
+export * from './employee';

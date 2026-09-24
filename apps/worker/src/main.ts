@@ -1,3 +1,6 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { createPrismaClient, type PrismaClient } from '@context/database';
 
 import { OutboxDispatcher } from './dispatcher.js';
@@ -57,7 +60,11 @@ async function bootstrap(): Promise<void> {
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
 }
 
-if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop() ?? '')) {
+const isDirectRun =
+  process.argv[1] !== undefined &&
+  path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
+
+if (isDirectRun) {
   bootstrap().catch((error: unknown) => {
     workerLogger().fatal({ err: error }, 'Worker не запустился');
     process.exitCode = 1;

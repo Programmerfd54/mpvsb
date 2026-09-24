@@ -166,6 +166,11 @@ export default function DonePage() {
               По вопросам об участии обратитесь к отправителю приглашения.
             </p>
           )}
+          <div>
+            <ButtonLink href="/participant/privacy" variant="secondary">
+              Управление участием
+            </ButtonLink>
+          </div>
           {logoutError ? (
             <Callout tone="danger" role="alert" title="Не удалось завершить сеанс">
               Проверьте подключение и повторите попытку.
